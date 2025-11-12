@@ -1,36 +1,37 @@
-🛰️ StreamWatch — Real-Time DAO Governance Tracker
+# 🛰️ StreamWatch — Real-Time DAO Governance Tracker
 
 Track DAO proposals, votes, and quorum updates in real-time using Somnia Data Streams, powered by Next.js + ConnectKit + Recharts + TailwindCSS.
 
-🚀 Overview
+# 🚀 Overview
 
 StreamWatch brings governance transparency to DAOs by providing live updates on proposals and votes using Somnia Data Streams SDK.
 Users can connect their wallet, view active proposals, and see vote tallies update as they happen — no page refresh needed.
 
 This project was built for the Somnia Hackathon, highlighting the power of streaming blockchain data in real-time governance.
 
-🧩 Features
+# 🧩 Features
 
-✅ Real-Time Data: Live proposal and voting updates via Somnia Data Streams
-✅ Wallet Integration: Seamless wallet connect with ConnectKit
-✅ On-Chain DAO Governance: Built on the Somnia Testnet
-✅ Data Visualization: Realtime charts with Recharts
-✅ Unified Next.js Architecture: Backend API routes and frontend in one deployable app
-✅ Modern UI: TailwindCSS (Blue/White Theme)
+- ✅ Real-Time Data: Live proposal and voting updates via Somnia Data Streams
+- ✅ Wallet Integration: Seamless wallet connect with ConnectKit
+- ✅ On-Chain DAO Governance: Built on the Somnia Testnet
+- ✅ Data Visualization: Realtime charts with Recharts
+- ✅ Unified Next.js Architecture: Backend API routes and frontend in one deployable app
+- ✅ Modern UI: TailwindCSS (Blue/White Theme)
 
-🏗️ Tech Stack
-Layer Technology
-Frontend Next.js 14, TailwindCSS v3, Recharts
-Backend Next.js API Routes (Node.js + Somnia SDK)
-Wallet ConnectKit + Wagmi + ethers v6
-Smart Contract Solidity v0.8.30 + Hardhat v2 + Typescript
-Blockchain Somnia Testnet
-Streaming SDK Somnia Data Streams SDK
-⚙️ Installation & Setup
+# 🏗️ Tech Stack
+- Layer Technology
+- Frontend Next.js 14, TailwindCSS v3, Recharts
+- Backend Next.js API Routes (Node.js + Somnia SDK)
+- Wallet ConnectKit + Wagmi + ethers v6
+- Smart Contract Solidity v0.8.30 + Hardhat v2 + Typescript
+- Blockchain Somnia Testnet
+- Streaming SDK Somnia Data Streams SDK
+
+# ⚙️ Installation & Setup
 
 1. Clone the Repository
-   git clone https://github.com/<yourusername>/streamwatch.git
-   cd streamwatch
+   - git clone https://github.com/holyaustin/streamwatch.git
+   - cd streamwatch
 
 2. Install Dependencies
 
@@ -46,14 +47,15 @@ yarn install
 
 Create a .env.local file at the root of your project:
 
-NEXT_PUBLIC_SOMNIA_API_KEY=your_somnia_api_key
-NEXT_PUBLIC_NETWORK_URL=https://rpc.testnet.somnia.network
-NEXT_PUBLIC_CHAIN_ID=--somnia-chain-id--
+- NEXT_PUBLIC_SOMNIA_API_KEY=your_somnia_api_key
+- NEXT_PUBLIC_NETWORK_URL=https://rpc.testnet.somnia.network
+- NEXT_PUBLIC_CHAIN_ID=--somnia-chain-id--
 
 If you don’t have an API key, get one from Somnia Developer Dashboard
 .
 
-🧠 Architecture Overview
+# 🧠 Architecture Overview
+
 streamwatch/
 ├── contracts/ # Smart Contracts (DAO Governance)
 │ ├── DaoGovernance.sol
@@ -88,9 +90,9 @@ streamwatch/
 🪄 Run Locally
 
 1. Compile & Deploy Contract (Somnia Testnet)
-   cd contracts
-   npx hardhat compile
-   npx hardhat run scripts/deploy.ts --network somnia-testnet
+   - cd contracts
+   - npx hardhat compile
+   - npx hardhat run scripts/deploy.ts --network somnia-testnet
 
 2. Start the Development Server
 
