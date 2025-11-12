@@ -1,0 +1,62 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+frontend/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+frontend/coverage
+
+# next.js
+frontend/.next/
+frontend/out/
+frontend/.env.local
+frontend/.env
+
+# production
+frontend/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+
+smart-contracts/node_modules
+smart-contracts/.env
+
+# Hardhat files
+smart-contracts/cache
+smart-contracts/artifacts
+
+# TypeChain files
+smart-contracts/typechain
+smart-contracts/typechain-types
+
+# solidity-coverage files
+smart-contracts/coverage
+smart-contracts/coverage.json
+
+# Hardhat Ignition default folder for deployments against a local node
+smart-contracts/ignition/deployments/chain-31337
