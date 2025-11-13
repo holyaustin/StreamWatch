@@ -1,5 +1,49 @@
 # 🛰️ StreamWatch — Real-Time DAO Governance Tracker
 
+StreamWatch — Real-time DAO governance tracker built on **Somnia Data Streams SDK**.
+
+A hackathon-ready demo that shows how Somnia Data Streams can power live proposals and votes in a transparent, on-chain manner. The project uses a single Next.js app (frontend + server API routes) so it can be deployed to **Vercel** as one project.
+
+---
+
+# 🚀 Overview
+
+StreamWatch brings governance transparency to DAOs by providing live updates on proposals and votes using Somnia Data Streams SDK.
+Users can connect their wallet, view active proposals, and see vote tallies update as they happen — no page refresh needed.
+
+This project was built for the Somnia Hackathon, highlighting the power of streaming blockchain data in real-time governance.
+
+---
+
+## Features
+
+- Live proposals & vote publishing via Somnia Data Streams SDK  
+- Wallet connect using **ConnectKit** + **wagmi** (viem-based RPC)  
+- Polling reads for serverless-friendly real-time UI (3500 ms default)  
+- Clean blue & white UI with TailwindCSS v3  
+- Single deployable Next.js app (pages/api server + app/ UI)
+
+---
+
+## Quick links
+
+- Somnia Docs — Data Streams quickstart and tutorials: https://docs.somnia.network/somnia-data-streams/getting-started/quickstart  
+- Somnia On-chain chat tutorial: https://docs.somnia.network/somnia-data-streams/tutorials/build-a-minimal-on-chain-chat-app  
+- ConnectKit guide (Somnia): https://docs.somnia.network/developer/building-dapps/wallet-integration-and-auth/authenticating-with-connectkit
+
+---
+
+## Repo layout
+
+
+
+
+
+
+
+
+# 🛰️ StreamWatch — Real-Time DAO Governance Tracker
+
 Track DAO proposals, votes, and quorum updates in real-time using Somnia Data Streams, powered by Next.js + ConnectKit + Recharts + TailwindCSS.
 
 # 🚀 Overview
