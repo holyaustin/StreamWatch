@@ -1,181 +1,263 @@
-'use client'
+// no "use server" here — this file is used by API routes & server code
 
-import { SDK, SchemaEncoder, zeroBytes32 } from '@somnia-chain/streams'
+
+import {
+  SDK,
+  SchemaEncoder,
+  zeroBytes32,
+} from "@somnia-chain/streams";
 import {
   createPublicClient,
   createWalletClient,
   http,
-  toHex,
   Hex,
   defineChain,
-} from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
-import { waitForTransactionReceipt } from 'viem/actions'
+  toHex,
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { waitForTransactionReceipt } from "viem/actions";
 
-// -----------------------------
-// ⚙️ Define Somnia Dream Chain
-// -----------------------------
+/* ----------------------------------------------------
+   SOMNIA DREAM CHAIN CONFIG
+---------------------------------------------------- */
 export const dreamChain = defineChain({
   id: 50312,
-  name: 'Somnia Dream',
-  network: 'somnia-dream',
-  nativeCurrency: { name: 'STT', symbol: 'STT', decimals: 18 },
+  name: "Somnia Dream",
+  network: "somnia-dream",
+  nativeCurrency: { name: "STT", symbol: "STT", decimals: 18 },
   rpcUrls: {
-    default: { http: ['https://dream-rpc.somnia.network'] },
+    default: { http: ["https://dream-rpc.somnia.network"] },
   },
   blockExplorers: {
     default: {
-      name: 'Somnia Explorer',
-      url: 'https://shannon-explorer.somnia.network/',
-      apiUrl: 'https://shannon-explorer.somnia.network/api',
+      name: "Somnia Explorer",
+      url: "https://shannon-explorer.somnia.network/",
+      apiUrl: "https://shannon-explorer.somnia.network/api",
     },
   },
-})
+});
 
-// -----------------------------
-// ⚙️ Environment Config
-// -----------------------------
-const PRIVATE_KEY = process.env.NEXT_PUBLIC_DEPLOYER_KEY as `0x${string}`
-if (!PRIVATE_KEY) throw new Error('❌ Missing NEXT_PUBLIC_DEPLOYER_KEY in .env')
+/* ----------------------------------------------------
+   ENVIRONMENT
+---------------------------------------------------- */
+const PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`;
+if (!PRIVATE_KEY) throw new Error("❌ Missing PRIVATE_KEY in .env");
 
-const account = privateKeyToAccount(PRIVATE_KEY)
+const account = privateKeyToAccount(PRIVATE_KEY);
 
-// -----------------------------
-// 🧩 Initialize SDK + Clients
-// -----------------------------
-export function initSomniaStreams() {
+export const PUBLISHER_ADDRESS =
+  (process.env.PUBLISHER_ADDRESS as `0x${string}`) || account.address;
+
+/* ----------------------------------------------------
+   SCHEMAS
+---------------------------------------------------- */
+const PROPOSAL_SCHEMA =
+  "string proposalId, string title, address proposer, uint256 timestamp, string status, uint256 votes";
+
+const VOTE_SCHEMA =
+  "string proposalId, address voter, bool support, uint256 timestamp";
+
+let _cachedProposalSchemaId: `0x${string}` | undefined;
+let _cachedVoteSchemaId: `0x${string}` | undefined;
+
+/* ----------------------------------------------------
+   TYPES
+---------------------------------------------------- */
+export type DecodedItem = {
+  name: string;
+  type: string;
+  value: any;
+};
+
+function extract(item: DecodedItem): string {
+  return String(item?.value ?? "");
+}
+
+/* ----------------------------------------------------
+   INIT CLIENTS
+---------------------------------------------------- */
+function initClients() {
   const publicClient = createPublicClient({
     chain: dreamChain,
     transport: http(),
-  })
+  });
+
   const walletClient = createWalletClient({
     account,
     chain: dreamChain,
     transport: http(),
-  })
+  });
 
-  const sdk = new SDK({ public: publicClient, wallet: walletClient })
-  console.log('✅ Somnia SDK initialized')
-
-  return { sdk, publicClient, walletClient }
+  const sdk = new SDK({ public: publicClient, wallet: walletClient });
+  return { sdk, publicClient };
 }
 
-// -----------------------------
-// 🧩 Register Proposal Schema
-// -----------------------------
-export async function registerProposalSchema(): Promise<`0x${string}`> {
-  const { sdk, publicClient } = initSomniaStreams()
-  const schema =
-    'string proposalId, string title, uint256 voteCount, uint256 quorum, string status'
-  const schemaId = await sdk.streams.computeSchemaId(schema)
+/* ----------------------------------------------------
+   REGISTER SCHEMAS
+---------------------------------------------------- */
+export async function ensureSchemasRegistered() {
+  const { sdk, publicClient } = initClients();
+
+  if (_cachedProposalSchemaId && _cachedVoteSchemaId) {
+    return {
+      proposalSchemaId: _cachedProposalSchemaId,
+      voteSchemaId: _cachedVoteSchemaId,
+    };
+  }
+
+  const proposalSchemaId = await sdk.streams.computeSchemaId(
+    PROPOSAL_SCHEMA
+  ) as `0x${string}`;
+
+  const voteSchemaId = await sdk.streams.computeSchemaId(
+    VOTE_SCHEMA
+  ) as `0x${string}`;
 
   try {
-    const txHash = await sdk.streams.registerDataSchemas(
+    const tx = await sdk.streams.registerDataSchemas(
       [
         {
-          id: 'DAOProposal',
-          schema,
+          id: "proposal_schema",
+          schema: PROPOSAL_SCHEMA,
+          parentSchemaId: zeroBytes32 as `0x${string}`,
+        },
+        {
+          id: "vote_schema",
+          schema: VOTE_SCHEMA,
           parentSchemaId: zeroBytes32 as `0x${string}`,
         },
       ],
-      true,
-    )
+      true
+    );
 
-    if (typeof txHash === 'string' && txHash.startsWith('0x')) {
-      await waitForTransactionReceipt(publicClient, { hash: txHash as `0x${string}` })
-      console.log(`✅ Schema registered or confirmed: ${txHash}`)
-    } else if (txHash instanceof Error) {
-      console.warn('⚠️ Schema registration returned an error:', txHash.message)
-    } else {
-      console.log('ℹ️ Schema already registered or no transaction returned.')
+    if (typeof tx === "string" && tx.startsWith("0x")) {
+      await waitForTransactionReceipt(publicClient, {
+        hash: tx as `0x${string}`,
+      });
     }
-  } catch (err) {
-    console.error('⚠️ Schema registration failed:', err)
+  } catch (e) {
+    console.warn("⚠️ Schema already exists");
   }
 
-  // ✅ Always return a value of the correct type
-  return schemaId as `0x${string}`
+  _cachedProposalSchemaId = proposalSchemaId;
+  _cachedVoteSchemaId = voteSchemaId;
+
+  return { proposalSchemaId, voteSchemaId };
 }
 
-
-
-// -----------------------------
-// 🚀 Publish Proposal Event
-// -----------------------------
-export interface ProposalEvent {
-  proposalId: string
-  title: string
-  voteCount: number
-  quorum: number
-  status: string
+/* ----------------------------------------------------
+   EXPOSE SCHEMA IDS FOR STREAMING CLIENT
+---------------------------------------------------- */
+export async function getSchemaIds() {
+  return await ensureSchemasRegistered();
 }
 
-export async function publishProposalEvent(
-  schemaId: `0x${string}`,
-  data: ProposalEvent,
+/* ----------------------------------------------------
+   PUBLISH PROPOSAL
+---------------------------------------------------- */
+export async function publishProposal(
+  proposalId: string,
+  title: string,
+  proposer: string
 ) {
-  const { sdk } = initSomniaStreams()
-  const encoder = new SchemaEncoder(
-    'string proposalId, string title, uint256 voteCount, uint256 quorum, string status',
-  )
+  const { sdk } = initClients();
+  const { proposalSchemaId } = await ensureSchemasRegistered();
 
-  const encodedData = encoder.encodeData([
-    { name: 'proposalId', value: data.proposalId, type: 'string' },
-    { name: 'title', value: data.title, type: 'string' },
-    { name: 'voteCount', value: BigInt(data.voteCount), type: 'uint256' },
-    { name: 'quorum', value: BigInt(data.quorum), type: 'uint256' },
-    { name: 'status', value: data.status, type: 'string' },
-  ])
+  const encoder = new SchemaEncoder(PROPOSAL_SCHEMA);
+  const now = BigInt(Math.floor(Date.now() / 1000));
 
-  const streamData = [
+  const data = encoder.encodeData([
+    { name: "proposalId", type: "string", value: proposalId },
+    { name: "title", type: "string", value: title },
+    { name: "proposer", type: "address", value: proposer },
+    { name: "timestamp", type: "uint256", value: now },
+    { name: "status", type: "string", value: "open" },
+    { name: "votes", type: "uint256", value: BigInt(0) },
+  ]);
+
+  const tx = await sdk.streams.set([
     {
-      id: toHex(data.proposalId, { size: 32 }) as Hex, // ✅ properly typed
-      schemaId,
-      data: encodedData,
+      id: toHex(proposalId, { size: 32 }) as Hex,
+      schemaId: proposalSchemaId,
+      data,
     },
-  ]
+  ]);
 
-  const tx = await sdk.streams.set(streamData)
-  console.log(`📤 Published proposal event Tx: ${tx}`)
+  return String(tx);
 }
 
-// -----------------------------
-// 🔔 Subscribe to Proposal Events
-// -----------------------------
-export async function subscribeToProposalEvents(
-  schemaId: `0x${string}`,
-  publisher: `0x${string}`,
-  onEvent: (event: ProposalEvent) => void,
+/* ----------------------------------------------------
+   PUBLISH VOTE
+---------------------------------------------------- */
+export async function publishVote(
+  proposalId: string,
+  voter: string,
+  support: boolean
 ) {
-  const { sdk } = initSomniaStreams()
-  const seen = new Set<string>()
+  const { sdk } = initClients();
+  const { voteSchemaId } = await ensureSchemasRegistered();
 
-  setInterval(async () => {
-    const allData = await sdk.streams.getAllPublisherDataForSchema(
-      schemaId,
-      publisher,
-    )
-    if (!allData) return
+  const encoder = new SchemaEncoder(VOTE_SCHEMA);
+  const now = BigInt(Math.floor(Date.now() / 1000));
 
-    allData.forEach((item: any) => {
-      if (!Array.isArray(item)) return
+  const data = encoder.encodeData([
+    { name: "proposalId", type: "string", value: proposalId },
+    { name: "voter", type: "address", value: voter },
+    { name: "support", type: "bool", value: support },
+    { name: "timestamp", type: "uint256", value: now },
+  ]);
 
-      const safeVal = (v: any): string => String(v?.value?.value ?? v?.value ?? '')
+  const tx = await sdk.streams.set([
+    {
+      id: toHex(`${proposalId}-${now}`, { size: 32 }) as Hex,
+      schemaId: voteSchemaId,
+      data,
+    },
+  ]);
 
-      const event: ProposalEvent = {
-        proposalId: safeVal(item[0]),
-        title: safeVal(item[1]),
-        voteCount: Number(safeVal(item[2])),
-        quorum: Number(safeVal(item[3])),
-        status: safeVal(item[4]),
-      }
+  return String(tx);
+}
 
-      const id = `${event.proposalId}-${event.voteCount}`
-      if (!seen.has(id)) {
-        seen.add(id)
-        onEvent(event)
-        console.log('🆕 New governance event:', event)
-      }
-    })
-  }, 4000)
+/* ----------------------------------------------------
+   READ PROPOSALS
+---------------------------------------------------- */
+export async function readProposals() {
+  const { sdk } = initClients();
+  const { proposalSchemaId } = await ensureSchemasRegistered();
+
+  const rows = await sdk.streams.getAllPublisherDataForSchema(
+    proposalSchemaId,
+    PUBLISHER_ADDRESS
+  );
+
+  return (rows as DecodedItem[][]).map((row) => ({
+    proposalId: extract(row[0]),
+    title: extract(row[1]),
+    proposer: extract(row[2]),
+    timestamp: Number(extract(row[3])),
+    status: extract(row[4]),
+    votes: Number(extract(row[5])),
+  }));
+}
+
+/* ----------------------------------------------------
+   READ VOTES
+---------------------------------------------------- */
+export async function readVotesForProposal(proposalId: string) {
+  const { sdk } = initClients();
+  const { voteSchemaId } = await ensureSchemasRegistered();
+
+  const rows = await sdk.streams.getAllPublisherDataForSchema(
+    voteSchemaId,
+    PUBLISHER_ADDRESS
+  );
+
+  return (rows as DecodedItem[][])
+    .map((row) => ({
+      proposalId: extract(row[0]),
+      voter: extract(row[1]),
+      support: extract(row[2]) === "true",
+      timestamp: Number(extract(row[3])),
+    }))
+    .filter((x) => x.proposalId === proposalId);
 }
