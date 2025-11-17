@@ -1,18 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { publishProposal, readProposals } from "@/lib/sdsService";
+import { ConnectKitButton } from "connectkit";
+import { useAccount } from "wagmi";
 
 export default function ProposePage() {
+  const { isConnected, address } = useAccount();
+
   const [proposalId, setProposalId] = useState("");
   const [title, setTitle] = useState("");
-  const [proposer, setProposer] = useState("");
   const [loading, setLoading] = useState(false);
   const [proposals, setProposals] = useState<any[]>([]);
 
   async function loadProposals() {
     try {
-      const data = await readProposals();
+      const res = await fetch("/api/read/proposals");
+      const data = await res.json();
       setProposals(data);
     } catch (err) {
       console.error("Failed loading proposals:", err);
@@ -24,15 +27,26 @@ export default function ProposePage() {
   }, []);
 
   async function submitProposal() {
-    if (!proposalId || !title || !proposer) return alert("Fill all fields");
+    if (!proposalId || !title || !address)
+      return alert("Fill all fields and connect wallet");
 
     setLoading(true);
     try {
-      await publishProposal(proposalId, title, proposer);
-      alert("Proposal published!");
+      const res = await fetch("/api/publish/proposal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proposalId,
+          title,
+          proposer: address,
+        }),
+      });
+
+      const out = await res.json();
+
+      alert("Proposal published: " + out.tx);
       setProposalId("");
       setTitle("");
-      setProposer("");
       await loadProposals();
     } catch (err) {
       console.error(err);
@@ -46,7 +60,13 @@ export default function ProposePage() {
     <div className="p-8 max-w-2xl mx-auto space-y-8">
       <h1 className="text-3xl font-bold">Create Proposal</h1>
 
-      {/* Form */}
+      {!isConnected && (
+        <div className="p-4 border rounded bg-yellow-50">
+          <p className="mb-2">Connect your wallet to create proposals</p>
+          <ConnectKitButton />
+        </div>
+      )}
+
       <div className="space-y-4 p-6 border rounded-xl bg-white shadow">
         <input
           type="text"
@@ -58,18 +78,10 @@ export default function ProposePage() {
 
         <input
           type="text"
-          placeholder="Title"
+          placeholder="Proposal Title"
           className="w-full p-3 border rounded-xl"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-        />
-
-        <input
-          type="text"
-          placeholder="Proposer Address (0x...)"
-          className="w-full p-3 border rounded-xl"
-          value={proposer}
-          onChange={(e) => setProposer(e.target.value)}
         />
 
         <button
@@ -77,11 +89,10 @@ export default function ProposePage() {
           disabled={loading}
           className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:bg-gray-400"
         >
-          {loading ? "Submitting..." : "Submit Proposal"}
+          {loading ? "Submitting..." : "Publish Proposal"}
         </button>
       </div>
 
-      {/* List of Proposals */}
       <h2 className="text-2xl font-semibold">Existing Proposals</h2>
 
       {proposals.length === 0 && (

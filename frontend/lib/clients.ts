@@ -1,3 +1,4 @@
+// frontend/lib/clients.ts
 import { createPublicClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { somniaTestnet } from "./chain";
@@ -11,7 +12,7 @@ export function getPublicClient() {
 
 export function getWalletClient() {
   const pk = process.env.PRIVATE_KEY;
-  if (!pk) throw new Error("PRIVATE_KEY not set");
+  if (!pk) throw new Error("PRIVATE_KEY not set in server environment");
   return createWalletClient({
     chain: somniaTestnet,
     transport: http(process.env.NEXT_PUBLIC_SOMNIA_RPC || "https://dream-rpc.somnia.network"),

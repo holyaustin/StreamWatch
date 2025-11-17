@@ -1,15 +1,36 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { readProposals } from "@/lib/sdsService";
 import Link from "next/link";
 
 export default function ProposalsPage() {
   const [proposals, setProposals] = useState<any[]>([]);
+  const [schemasLoaded, setSchemasLoaded] = useState(false);
+
+  // Load schemas first
+  useEffect(() => {
+    (async () => {
+      await fetch("/api/schemas", { cache: "no-store" });
+      setSchemasLoaded(true);
+    })();
+  }, []);
 
   useEffect(() => {
-    readProposals().then(setProposals);
-  }, []);
+    if (!schemasLoaded) return;
+
+    async function load() {
+      try {
+        const res = await fetch("/api/read/proposals");
+        if (!res.ok) throw new Error("Failed to load proposals");
+        const items = await res.json();
+        setProposals(items ?? []);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    load();
+  }, [schemasLoaded]);
 
   return (
     <div className="p-8 max-w-3xl mx-auto space-y-6">

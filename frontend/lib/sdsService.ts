@@ -16,6 +16,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { waitForTransactionReceipt } from "viem/actions";
+import 'dotenv/config'
 
 /* ----------------------------------------------------
    SOMNIA DREAM CHAIN CONFIG
@@ -41,9 +42,12 @@ export const dreamChain = defineChain({
    ENVIRONMENT
 ---------------------------------------------------- */
 const PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`;
+// console.log("🔑Private key is direct", process.env.PRIVATE_KEY)
+console.log("PRIVATE_KEY", PRIVATE_KEY );
 if (!PRIVATE_KEY) throw new Error("❌ Missing PRIVATE_KEY in .env");
 
 const account = privateKeyToAccount(PRIVATE_KEY);
+console.log("Account is", account.address);
 
 export const PUBLISHER_ADDRESS =
   (process.env.PUBLISHER_ADDRESS as `0x${string}`) || account.address;

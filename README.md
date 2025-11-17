@@ -189,3 +189,7 @@ MIT © 2025 [Your Name or Team Name]
 - ConnectKit Wallet Integration Guide
 
 - Recharts Documentation
+
+
+
+{"proposalSchemaId":"0xf4c7813bc6f90af786c6b7c9945222532ec3fdbc005e67340da6b77e3c43f3a2","voteSchemaId":"0xcc66e482e0a9a3ee984aaaa39c6ebe6546b93f92a5c830f88930027fa47cba6c"}
