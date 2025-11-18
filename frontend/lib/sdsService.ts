@@ -1,22 +1,25 @@
-// no "use server" here — this file is used by API routes & server code
-
+// lib/sdsService.ts
+// Clean, production-ready, stable SDS service
 
 import {
   SDK,
   SchemaEncoder,
   zeroBytes32,
 } from "@somnia-chain/streams";
+
 import {
   createPublicClient,
   createWalletClient,
   http,
   Hex,
   defineChain,
-  toHex,
+  keccak256,
+  stringToHex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { waitForTransactionReceipt } from "viem/actions";
-import 'dotenv/config'
+
+import "dotenv/config";
 
 /* ----------------------------------------------------
    SOMNIA DREAM CHAIN CONFIG
@@ -42,8 +45,6 @@ export const dreamChain = defineChain({
    ENVIRONMENT
 ---------------------------------------------------- */
 const PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`;
-// console.log("🔑Private key is direct", process.env.PRIVATE_KEY)
-console.log("PRIVATE_KEY", PRIVATE_KEY );
 if (!PRIVATE_KEY) throw new Error("❌ Missing PRIVATE_KEY in .env");
 
 const account = privateKeyToAccount(PRIVATE_KEY);
@@ -56,7 +57,7 @@ export const PUBLISHER_ADDRESS =
    SCHEMAS
 ---------------------------------------------------- */
 const PROPOSAL_SCHEMA =
-  "string proposalId, string title, address proposer, uint256 timestamp, string status, uint256 votes";
+  "string proposalId, string title, address proposer, uint256 timestamp";
 
 const VOTE_SCHEMA =
   "string proposalId, address voter, bool support, uint256 timestamp";
@@ -65,7 +66,7 @@ let _cachedProposalSchemaId: `0x${string}` | undefined;
 let _cachedVoteSchemaId: `0x${string}` | undefined;
 
 /* ----------------------------------------------------
-   TYPES
+   HELPERS
 ---------------------------------------------------- */
 export type DecodedItem = {
   name: string;
@@ -75,6 +76,11 @@ export type DecodedItem = {
 
 function extract(item: DecodedItem): string {
   return String(item?.value ?? "");
+}
+
+// Generate a stable 32-byte ID from a string
+function id32(input: string): Hex {
+  return keccak256(stringToHex(input)) as Hex;
 }
 
 /* ----------------------------------------------------
@@ -97,11 +103,12 @@ function initClients() {
 }
 
 /* ----------------------------------------------------
-   REGISTER SCHEMAS
+   REGISTER SCHEMAS SAFELY
 ---------------------------------------------------- */
 export async function ensureSchemasRegistered() {
   const { sdk, publicClient } = initClients();
 
+  // Use cached values if available
   if (_cachedProposalSchemaId && _cachedVoteSchemaId) {
     return {
       proposalSchemaId: _cachedProposalSchemaId,
@@ -109,51 +116,44 @@ export async function ensureSchemasRegistered() {
     };
   }
 
-  const proposalSchemaId = await sdk.streams.computeSchemaId(
+  const proposalSchemaId = (await sdk.streams.computeSchemaId(
     PROPOSAL_SCHEMA
-  ) as `0x${string}`;
+  )) as `0x${string}`;
 
-  const voteSchemaId = await sdk.streams.computeSchemaId(
+  const voteSchemaId = (await sdk.streams.computeSchemaId(
     VOTE_SCHEMA
-  ) as `0x${string}`;
+  )) as `0x${string}`;
 
+  // Try registration once
   try {
     const tx = await sdk.streams.registerDataSchemas(
       [
         {
           id: "proposal_schema",
           schema: PROPOSAL_SCHEMA,
-          parentSchemaId: zeroBytes32 as `0x${string}`,
+          parentSchemaId: zeroBytes32 as Hex,
         },
         {
           id: "vote_schema",
           schema: VOTE_SCHEMA,
-          parentSchemaId: zeroBytes32 as `0x${string}`,
+          parentSchemaId: zeroBytes32 as Hex,
         },
       ],
-      true
+      true // allowFailure
     );
 
+    // Only wait if a real tx is returned
     if (typeof tx === "string" && tx.startsWith("0x")) {
-      await waitForTransactionReceipt(publicClient, {
-        hash: tx as `0x${string}`,
-      });
+      await waitForTransactionReceipt(publicClient, { hash: tx });
     }
   } catch (e) {
-    console.warn("⚠️ Schema already exists");
+    console.warn("⚠️ Schemas probably already registered.");
   }
 
   _cachedProposalSchemaId = proposalSchemaId;
   _cachedVoteSchemaId = voteSchemaId;
 
   return { proposalSchemaId, voteSchemaId };
-}
-
-/* ----------------------------------------------------
-   EXPOSE SCHEMA IDS FOR STREAMING CLIENT
----------------------------------------------------- */
-export async function getSchemaIds() {
-  return await ensureSchemasRegistered();
 }
 
 /* ----------------------------------------------------
@@ -175,13 +175,11 @@ export async function publishProposal(
     { name: "title", type: "string", value: title },
     { name: "proposer", type: "address", value: proposer },
     { name: "timestamp", type: "uint256", value: now },
-    { name: "status", type: "string", value: "open" },
-    { name: "votes", type: "uint256", value: BigInt(0) },
   ]);
 
   const tx = await sdk.streams.set([
     {
-      id: toHex(proposalId, { size: 32 }) as Hex,
+      id: id32(`proposal-${proposalId}`),
       schemaId: proposalSchemaId,
       data,
     },
@@ -213,7 +211,7 @@ export async function publishVote(
 
   const tx = await sdk.streams.set([
     {
-      id: toHex(`${proposalId}-${now}`, { size: 32 }) as Hex,
+      id: id32(`vote-${proposalId}-${now}`),
       schemaId: voteSchemaId,
       data,
     },
@@ -223,38 +221,52 @@ export async function publishVote(
 }
 
 /* ----------------------------------------------------
-   READ PROPOSALS
+   READ PROPOSALS (SAFE)
 ---------------------------------------------------- */
 export async function readProposals() {
   const { sdk } = initClients();
   const { proposalSchemaId } = await ensureSchemasRegistered();
 
-  const rows = await sdk.streams.getAllPublisherDataForSchema(
-    proposalSchemaId,
-    PUBLISHER_ADDRESS
-  );
+  let rows: any = [];
+
+  try {
+    rows = await sdk.streams.getAllPublisherDataForSchema(
+      proposalSchemaId,
+      PUBLISHER_ADDRESS
+    );
+  } catch (err: any) {
+    if (String(err).includes("NoData")) return [];
+    console.error("readProposals error", err);
+    return [];
+  }
 
   return (rows as DecodedItem[][]).map((row) => ({
     proposalId: extract(row[0]),
     title: extract(row[1]),
     proposer: extract(row[2]),
     timestamp: Number(extract(row[3])),
-    status: extract(row[4]),
-    votes: Number(extract(row[5])),
   }));
 }
 
 /* ----------------------------------------------------
-   READ VOTES
+   READ VOTES (SAFE)
 ---------------------------------------------------- */
 export async function readVotesForProposal(proposalId: string) {
   const { sdk } = initClients();
   const { voteSchemaId } = await ensureSchemasRegistered();
 
-  const rows = await sdk.streams.getAllPublisherDataForSchema(
-    voteSchemaId,
-    PUBLISHER_ADDRESS
-  );
+  let rows: any = [];
+
+  try {
+    rows = await sdk.streams.getAllPublisherDataForSchema(
+      voteSchemaId,
+      PUBLISHER_ADDRESS
+    );
+  } catch (err: any) {
+    if (String(err).includes("NoData")) return [];
+    console.error("readVotes error", err);
+    return [];
+  }
 
   return (rows as DecodedItem[][])
     .map((row) => ({

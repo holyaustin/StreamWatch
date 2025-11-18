@@ -8,32 +8,20 @@ import { ConnectKitButton } from "connectkit";
 
 // Charts
 import {
-  BarChart, Bar,
-  LineChart, Line,
-  PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
 } from "recharts";
 
-// --------------------
-// Types
-// --------------------
-
-type ProposalRow = {
-  id: string;
-  title: string;
-  proposer: string;
-  timestamp: number;
-  votes: number;
-};
-
-type VoteRow = {
-  proposalId: string;
-  voter: string;
-  support: boolean;
-  timestamp: number;
-};
-
-// Colors for pie chart
 const PIE_COLORS = ["#2ecc71", "#e74c3c"];
 
 export default function DashboardPage() {
@@ -41,18 +29,17 @@ export default function DashboardPage() {
 
   const { data: balance } = useBalance({
     address,
-    watch: true,
+    query: { refetchInterval: 5000 },
   });
 
   const [schemasLoaded, setSchemasLoaded] = useState(false);
 
-  // Real-time state
-  const [proposals, setProposals] = useState<ProposalRow[]>([]);
-  const [votes, setVotes] = useState<VoteRow[]>([]);
+  const [proposals, setProposals] = useState<any[]>([]);
+  const [votes, setVotes] = useState<any[]>([]);
 
-  // --------------------
-  // Load schemas first
-  // --------------------
+  /* -----------------------------------------
+     LOAD SCHEMAS FIRST
+  ----------------------------------------- */
   useEffect(() => {
     (async () => {
       await fetch("/api/schemas", { cache: "no-store" });
@@ -60,59 +47,75 @@ export default function DashboardPage() {
     })();
   }, []);
 
-  // --------------------
-  // Real-time proposals stream
-  // --------------------
+  /* -----------------------------------------
+     REAL-TIME PROPOSALS STREAM
+  ----------------------------------------- */
   useEffect(() => {
     if (!schemasLoaded) return;
 
-    let unsubProposals: (() => void) | null = null;
+    let unsub: (() => void) | null = null;
 
     (async () => {
-      unsubProposals = await subscribeToProposals((p) => {
+      unsub = await subscribeToProposals((p) => {
+        const id = p.proposalId;
+        const title = p.title;
+        const proposer = p.proposer;
+
+        if (!id) return;
+
         setProposals((prev) => {
-          const exists = prev.find((x) => x.id === p.proposalId);
-          if (!exists) {
-            return [
-              ...prev,
-              {
-                id: p.proposalId,
-                title: p.title,
-                proposer: p.proposer,
-                timestamp: Date.now(),
-                votes: 0,
-              },
-            ];
-          }
-          return prev;
+          if (prev.find((x) => x.id === id)) return prev;
+
+          return [
+            ...prev,
+            {
+              id,
+              title,
+              proposer,
+              timestamp: Date.now(),
+              votes: 0,
+            },
+          ];
         });
       });
     })();
 
     return () => {
-      if (unsubProposals) unsubProposals();
+      if (unsub) unsub(); // always valid cleanup
     };
   }, [schemasLoaded]);
 
-  // --------------------
-  // Real-time votes stream
-  // --------------------
+  /* -----------------------------------------
+     REAL-TIME VOTES STREAM
+  ----------------------------------------- */
   useEffect(() => {
     if (!schemasLoaded) return;
 
-    let unsubMap = new Map<string, () => void>();
+    const unsubMap = new Map<string, () => void>();
 
     proposals.forEach((p) => {
       if (!unsubMap.has(p.id)) {
         (async () => {
           const unsub = await subscribeToVotes(p.id, (v) => {
-            setVotes((old) => [...old, { ...v, proposalId: p.id }]);
+            const support = v.support;
+            const voter = v.voter;
+            const ts = v.timestamp;
 
-            // increment vote count live
+            setVotes((old) => [
+              ...old,
+              {
+                proposalId: p.id,
+                voter,
+                support,
+                timestamp: ts,
+              },
+            ]);
+
+            // update proposal live vote count
             setProposals((rows) =>
               rows.map((r) =>
                 r.id === p.id
-                  ? { ...r, votes: r.votes + (v.support ? 1 : 0) }
+                  ? { ...r, votes: r.votes + (support ? 1 : 0) }
                   : r
               )
             );
@@ -124,36 +127,44 @@ export default function DashboardPage() {
     });
 
     return () => {
-      unsubMap.forEach((fn) => fn());
+      unsubMap.forEach((fn) => {
+        try {
+          fn();
+        } catch {}
+      });
       unsubMap.clear();
     };
   }, [proposals, schemasLoaded]);
 
-  // --------------------
-  // Stats
-  // --------------------
+  /* -----------------------------------------
+     STATS
+  ----------------------------------------- */
+
   const totalProposals = proposals.length;
   const totalVotes = votes.length;
-  const yesVotes = votes.filter((v) => v.support).length;
-  const noVotes = totalVotes - yesVotes;
+
+  const yesVotes = votes.filter((v) => v.support === true).length;
+  const noVotes = votes.filter((v) => v.support === false).length;
 
   const pieData = [
     { name: "Yes", value: yesVotes },
     { name: "No", value: noVotes },
   ];
 
-  // Line chart for proposals over time
   const proposalTimeline = proposals.map((p) => ({
     name: p.id,
     time: p.timestamp,
   }));
 
+  /* -----------------------------------------
+     REQUIRE WALLET CONNECTION
+  ----------------------------------------- */
   if (!isConnected) {
     return (
       <div className="min-h-screen flex items-center justify-center p-8">
         <div className="text-center space-y-4">
           <h2 className="text-2xl font-semibold mb-4">
-            Connect wallet to view the live SDS Governance Dashboard
+            Connect wallet to view the SDS Governance Dashboard
           </h2>
           <ConnectKitButton />
         </div>
@@ -161,20 +172,18 @@ export default function DashboardPage() {
     );
   }
 
+  /* -----------------------------------------
+     UI
+  ----------------------------------------- */
   return (
     <div className="p-8 space-y-6">
-
       <h1 className="text-4xl font-bold text-blue-800 mb-6">
         StreamWatch — SDS Live Governance Dashboard
       </h1>
 
-      {/* ------------------------- */}
-      {/* 2 × 2 GRID */}
-      {/* ------------------------- */}
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-        {/* CARD 1 — ACCOUNT DETAILS */}
+        {/* ACCOUNT CARD */}
         <div className="border rounded-xl p-6 bg-white shadow space-y-3">
           <h2 className="text-xl font-semibold">Your Account</h2>
           <p><strong>Address:</strong> {address}</p>
@@ -199,30 +208,22 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* CARD 2 — HOW TO TEST */}
+        {/* HOW TO TEST */}
         <div className="border rounded-xl p-6 bg-white shadow space-y-3">
           <h2 className="text-xl font-semibold">How to Test</h2>
-
           <ol className="list-decimal ml-5 space-y-2">
-            <li>Connect your wallet</li>
-            <li>Go to <Link href="/propose" className="underline text-blue-700">/propose</Link></li>
-            <li>Create a new proposal</li>
-            <li>Go to <Link href="/vote" className="underline text-blue-700">/vote</Link></li>
-            <li>Cast YES/NO votes in real-time</li>
-            <li>Watch updates appear instantly on this dashboard</li>
+            <li>Connect wallet</li>
+            <li>Create a proposal</li>
+            <li>Vote on any proposal</li>
+            <li>Watch live updates instantly</li>
           </ol>
-
-          <p className="mt-2 text-gray-500 text-sm">
-            Powered by Somnia Data Streams — live, reactive on-chain data.
-          </p>
         </div>
 
-        {/* CARD 3 — PROPOSAL CHARTS */}
+        {/* PROPOSALS STATS */}
         <div className="border rounded-xl p-6 bg-white shadow space-y-4">
           <h2 className="text-xl font-semibold">Proposals Overview</h2>
           <p><strong>Total Proposals:</strong> {totalProposals}</p>
 
-          {/* Bar chart */}
           <BarChart width={400} height={250} data={proposals}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="id" />
@@ -231,7 +232,6 @@ export default function DashboardPage() {
             <Bar dataKey="votes" fill="#1e40af" />
           </BarChart>
 
-          {/* Line chart */}
           <LineChart width={400} height={200} data={proposalTimeline}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -242,23 +242,15 @@ export default function DashboardPage() {
           </LineChart>
         </div>
 
-        {/* CARD 4 — VOTE CHARTS */}
+        {/* VOTES STATS */}
         <div className="border rounded-xl p-6 bg-white shadow space-y-4">
           <h2 className="text-xl font-semibold">Votes Overview</h2>
-
           <p><strong>Total Votes:</strong> {totalVotes}</p>
           <p><strong>YES:</strong> {yesVotes}</p>
           <p><strong>NO:</strong> {noVotes}</p>
 
-          {/* Pie chart */}
           <PieChart width={300} height={220}>
-            <Pie
-              data={pieData}
-              dataKey="value"
-              nameKey="name"
-              outerRadius={80}
-              label
-            >
+            <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={80} label>
               {pieData.map((entry, index) => (
                 <Cell key={index} fill={PIE_COLORS[index]} />
               ))}
@@ -266,7 +258,6 @@ export default function DashboardPage() {
             <Legend />
           </PieChart>
 
-          {/* Votes bar chart */}
           <BarChart width={350} height={220} data={votes}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="proposalId" />
