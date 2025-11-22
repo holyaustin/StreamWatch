@@ -4,17 +4,20 @@ import { readVotesForProposal } from "@/lib/sdsService";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const proposalId = searchParams.get("proposalId");
+    const proposalId = searchParams.get("proposalId") || "";
 
-    if (!proposalId) return NextResponse.json([]);
+    console.log("📡 READ VOTES FOR:", proposalId);
 
-    const rows = await readVotesForProposal(proposalId);
-    return NextResponse.json(rows ?? []);
+    const votes = await readVotesForProposal(proposalId);
+
+    console.log("📊 VOTES RETURNED:", votes);
+
+    return NextResponse.json(votes);
   } catch (err: any) {
-    if (err?.message?.includes("NoData")) {
-      return NextResponse.json([]);
-    }
-    console.error(err);
-    return NextResponse.json([], { status: 500 });
+    console.error("❌ ERROR READING VOTES:", err);
+    return NextResponse.json(
+      { error: "Failed to read votes", details: err.message },
+      { status: 500 }
+    );
   }
 }

@@ -16,6 +16,7 @@ export default function ProposePage() {
     try {
       const res = await fetch("/api/read/proposals");
       const data = await res.json();
+      console.log("📡 FRONTEND RECEIVED PROPOSALS:", data);
       setProposals(data);
     } catch (err) {
       console.error("Failed loading proposals:", err);
@@ -27,29 +28,40 @@ export default function ProposePage() {
   }, []);
 
   async function submitProposal() {
+    console.log("📝 FORM INPUT BEFORE SUBMIT:", {
+      proposalId,
+      title,
+      proposer: address,
+    });
+
     if (!proposalId || !title || !address)
       return alert("Fill all fields and connect wallet");
 
     setLoading(true);
     try {
+      const body = {
+        proposalId,
+        title,
+        proposer: address,
+      };
+
+      console.log("📤 FRONTEND SENDING TO API:", body);
+
       const res = await fetch("/api/publish/proposal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          proposalId,
-          title,
-          proposer: address,
-        }),
+        body: JSON.stringify(body),
       });
 
       const out = await res.json();
+      console.log("📥 FRONTEND RESPONSE FROM API:", out);
 
       alert("Proposal published: " + out.tx);
       setProposalId("");
       setTitle("");
       await loadProposals();
     } catch (err) {
-      console.error(err);
+      console.error("❌ FRONTEND PUBLISH ERROR:", err);
       alert("Failed to publish proposal");
     } finally {
       setLoading(false);
@@ -101,15 +113,10 @@ export default function ProposePage() {
 
       <div className="space-y-4">
         {proposals.map((p, i) => (
-          <div
-            key={i}
-            className="border rounded-xl p-4 bg-gray-50 shadow-sm"
-          >
+          <div key={i} className="border rounded-xl p-4 bg-gray-50 shadow-sm">
             <p><strong>ID:</strong> {p.proposalId}</p>
             <p><strong>Title:</strong> {p.title}</p>
             <p><strong>Proposer:</strong> {p.proposer}</p>
-            <p><strong>Status:</strong> {p.status}</p>
-            <p><strong>Votes:</strong> {p.votes}</p>
           </div>
         ))}
       </div>

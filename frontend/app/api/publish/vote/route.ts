@@ -1,20 +1,33 @@
 import { NextResponse } from "next/server";
-import { ensureSchemasRegistered, publishVote } from "@/lib/sdsService";
+import { publishVote } from "@/lib/sdsService";
 
 export async function POST(req: Request) {
   try {
-    const { proposalId, voter, support } = await req.json();
+    const body = await req.json();
 
-    if (!proposalId || !voter || typeof support === "undefined") {
-      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-    }
+    console.log("📥 API RECEIVED VOTE BODY:", body);
 
-    await ensureSchemasRegistered();
-    const tx = await publishVote(String(proposalId), voter, !!support);
+    const proposalId = typeof body.proposalId === "string"
+      ? body.proposalId
+      : body.proposalId?.proposalId || "";
+
+    const voter = body.voter;
+    const support = !!body.support;
+
+    console.log("📦 CLEANED VOTE FIELDS:", {
+      proposalId,
+      voter,
+      support,
+    });
+
+    const tx = await publishVote(proposalId, voter, support);
 
     return NextResponse.json({ tx });
   } catch (err: any) {
-    console.error("publish vote error", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("❌ ERROR IN VOTE API:", err);
+    return NextResponse.json(
+      { error: "Vote publish failed", details: err.message },
+      { status: 500 }
+    );
   }
 }

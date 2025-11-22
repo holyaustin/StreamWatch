@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { subscribeToProposals, subscribeToVotes } from "@/lib/sdsStreamClient";
 import { useAccount, useBalance } from "wagmi";
 import { ConnectKitButton } from "connectkit";
 
-// Charts
 import {
   BarChart,
   Bar,
@@ -37,6 +36,13 @@ export default function DashboardPage() {
   const [proposals, setProposals] = useState<any[]>([]);
   const [votes, setVotes] = useState<any[]>([]);
 
+  /** 
+   * 🔥 Persistent Maps to prevent repeated subscription setup 
+   */
+  const proposalSubscribedRef = useRef(false);
+  const voteSubMap = useRef<Map<string, () => void>>(new Map());
+  const knownVotes = useRef<Set<string>>(new Set()); // Deduplicate
+
   /* -----------------------------------------
      LOAD SCHEMAS FIRST
   ----------------------------------------- */
@@ -49,29 +55,25 @@ export default function DashboardPage() {
 
   /* -----------------------------------------
      REAL-TIME PROPOSALS STREAM
+     Subscribe ONCE ONLY
   ----------------------------------------- */
   useEffect(() => {
-    if (!schemasLoaded) return;
-
-    let unsub: (() => void) | null = null;
+    if (!schemasLoaded || proposalSubscribedRef.current) return;
 
     (async () => {
-      unsub = await subscribeToProposals((p) => {
-        const id = p.proposalId;
-        const title = p.title;
-        const proposer = p.proposer;
+      proposalSubscribedRef.current = true;
 
-        if (!id) return;
+      await subscribeToProposals((p) => {
+        if (!p.proposalId) return;
 
         setProposals((prev) => {
-          if (prev.find((x) => x.id === id)) return prev;
-
+          if (prev.some((x) => x.id === p.proposalId)) return prev;
           return [
             ...prev,
             {
-              id,
-              title,
-              proposer,
+              id: p.proposalId,
+              title: p.title,
+              proposer: p.proposer,
               timestamp: Date.now(),
               votes: 0,
             },
@@ -79,67 +81,67 @@ export default function DashboardPage() {
         });
       });
     })();
-
-    return () => {
-      if (unsub) unsub(); // always valid cleanup
-    };
   }, [schemasLoaded]);
 
   /* -----------------------------------------
      REAL-TIME VOTES STREAM
+     Each proposal gets ONE subscription only
+     Deduplication prevents repeated votes being added
   ----------------------------------------- */
   useEffect(() => {
     if (!schemasLoaded) return;
 
-    const unsubMap = new Map<string, () => void>();
-
     proposals.forEach((p) => {
-      if (!unsubMap.has(p.id)) {
+      if (!p?.id) return;
+
+      if (!voteSubMap.current.has(p.id)) {
         (async () => {
           const unsub = await subscribeToVotes(p.id, (v) => {
-            const support = v.support;
-            const voter = v.voter;
-            const ts = v.timestamp;
+            const voteKey = `${v.voter}-${v.timestamp}`;
 
-            setVotes((old) => [
-              ...old,
+            // Prevent duplicate votes (SDS replays history)
+            if (knownVotes.current.has(voteKey)) return;
+            knownVotes.current.add(voteKey);
+
+            // Add vote to list
+            setVotes((prev) => [
+              ...prev,
               {
                 proposalId: p.id,
-                voter,
-                support,
-                timestamp: ts,
+                voter: v.voter,
+                support: v.support,
+                timestamp: v.timestamp,
               },
             ]);
 
-            // update proposal live vote count
-            setProposals((rows) =>
-              rows.map((r) =>
-                r.id === p.id
-                  ? { ...r, votes: r.votes + (support ? 1 : 0) }
-                  : r
+            // Update proposal vote count
+            setProposals((prev) =>
+              prev.map((row) =>
+                row.id === p.id
+                  ? { ...row, votes: row.votes + (v.support ? 1 : 0) }
+                  : row
               )
             );
           });
 
-          unsubMap.set(p.id, unsub);
+          voteSubMap.current.set(p.id, unsub);
         })();
       }
     });
 
     return () => {
-      unsubMap.forEach((fn) => {
+      for (const fn of voteSubMap.current.values()) {
         try {
           fn();
         } catch {}
-      });
-      unsubMap.clear();
+      }
+      voteSubMap.current.clear();
     };
-  }, [proposals, schemasLoaded]);
+  }, [schemasLoaded, proposals]);
 
   /* -----------------------------------------
      STATS
   ----------------------------------------- */
-
   const totalProposals = proposals.length;
   const totalVotes = votes.length;
 
@@ -182,7 +184,6 @@ export default function DashboardPage() {
       </h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
         {/* ACCOUNT CARD */}
         <div className="border rounded-xl p-6 bg-white shadow space-y-3">
           <h2 className="text-xl font-semibold">Your Account</h2>
@@ -266,7 +267,6 @@ export default function DashboardPage() {
             <Bar dataKey="support" fill="#16a34a" />
           </BarChart>
         </div>
-
       </div>
     </div>
   );

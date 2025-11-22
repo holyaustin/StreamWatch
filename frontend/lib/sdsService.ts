@@ -1,90 +1,82 @@
 // lib/sdsService.ts
-// Clean, production-ready, stable SDS service
-
-import {
-  SDK,
-  SchemaEncoder,
-  zeroBytes32,
-} from "@somnia-chain/streams";
-
+import { SDK, SchemaEncoder, zeroBytes32 } from "@somnia-chain/streams";
 import {
   createPublicClient,
   createWalletClient,
   http,
   Hex,
   defineChain,
-  keccak256,
-  stringToHex,
+  toHex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { waitForTransactionReceipt } from "viem/actions";
-
 import "dotenv/config";
 
 /* ----------------------------------------------------
-   SOMNIA DREAM CHAIN CONFIG
+   Chain
 ---------------------------------------------------- */
 export const dreamChain = defineChain({
   id: 50312,
   name: "Somnia Dream",
   network: "somnia-dream",
   nativeCurrency: { name: "STT", symbol: "STT", decimals: 18 },
-  rpcUrls: {
-    default: { http: ["https://dream-rpc.somnia.network"] },
-  },
-  blockExplorers: {
-    default: {
-      name: "Somnia Explorer",
-      url: "https://shannon-explorer.somnia.network/",
-      apiUrl: "https://shannon-explorer.somnia.network/api",
-    },
-  },
+  rpcUrls: { default: { http: ["https://dream-rpc.somnia.network"] } },
 });
 
 /* ----------------------------------------------------
-   ENVIRONMENT
+   Env
 ---------------------------------------------------- */
 const PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`;
-if (!PRIVATE_KEY) throw new Error("❌ Missing PRIVATE_KEY in .env");
-
 const account = privateKeyToAccount(PRIVATE_KEY);
-console.log("Account is", account.address);
 
 export const PUBLISHER_ADDRESS =
   (process.env.PUBLISHER_ADDRESS as `0x${string}`) || account.address;
 
 /* ----------------------------------------------------
-   SCHEMAS
+   Schemas
 ---------------------------------------------------- */
-const PROPOSAL_SCHEMA =
+export const PROPOSAL_SCHEMA =
   "string proposalId, string title, address proposer, uint256 timestamp";
 
-const VOTE_SCHEMA =
+export const VOTE_SCHEMA =
   "string proposalId, address voter, bool support, uint256 timestamp";
 
+// cache
 let _cachedProposalSchemaId: `0x${string}` | undefined;
 let _cachedVoteSchemaId: `0x${string}` | undefined;
 
 /* ----------------------------------------------------
-   HELPERS
+   Helpers
 ---------------------------------------------------- */
-export type DecodedItem = {
-  name: string;
-  type: string;
-  value: any;
-};
-
-function extract(item: DecodedItem): string {
-  return String(item?.value ?? "");
+function safeValue(v: any) {
+  if (v == null) return "";
+  if (typeof v === "object" && "value" in v) {
+    const inner = v.value;
+    if (typeof inner === "bigint") return Number(inner);
+    return inner;
+  }
+  return v;
 }
 
-// Generate a stable 32-byte ID from a string
-function id32(input: string): Hex {
-  return keccak256(stringToHex(input)) as Hex;
+function extractFieldsFromSdkItem(item: any): Record<string, any> {
+  const out: Record<string, any> = {};
+
+  // SDS returns array: [ {name, value: {value}} , ... ]
+  if (Array.isArray(item)) {
+    for (const field of item) {
+      const raw = field?.value?.value;
+
+      if (typeof raw === "bigint") out[field.name] = Number(raw);
+      else out[field.name] = raw ?? "";
+    }
+  }
+
+  console.log("🔍 DECODED SDK ITEM (FIXED):", out);
+  return out;
 }
 
 /* ----------------------------------------------------
-   INIT CLIENTS
+   Clients
 ---------------------------------------------------- */
 function initClients() {
   const publicClient = createPublicClient({
@@ -99,55 +91,66 @@ function initClients() {
   });
 
   const sdk = new SDK({ public: publicClient, wallet: walletClient });
+
   return { sdk, publicClient };
 }
 
 /* ----------------------------------------------------
-   REGISTER SCHEMAS SAFELY
+   Register Schemas
 ---------------------------------------------------- */
 export async function ensureSchemasRegistered() {
   const { sdk, publicClient } = initClients();
 
-  // Use cached values if available
-  if (_cachedProposalSchemaId && _cachedVoteSchemaId) {
-    return {
-      proposalSchemaId: _cachedProposalSchemaId,
-      voteSchemaId: _cachedVoteSchemaId,
-    };
-  }
+  const proposalSchemaId =
+    (await sdk.streams.computeSchemaId(PROPOSAL_SCHEMA)) as `0x${string}`;
+  const voteSchemaId =
+    (await sdk.streams.computeSchemaId(VOTE_SCHEMA)) as `0x${string}`;
 
-  const proposalSchemaId = (await sdk.streams.computeSchemaId(
-    PROPOSAL_SCHEMA
-  )) as `0x${string}`;
+  console.log("🧩 COMPUTED SCHEMA IDS:", {
+    proposalSchemaId,
+    voteSchemaId,
+  });
 
-  const voteSchemaId = (await sdk.streams.computeSchemaId(
-    VOTE_SCHEMA
-  )) as `0x${string}`;
+  const proposalExists = await sdk.streams.isDataSchemaRegistered(
+    proposalSchemaId
+  );
+  const voteExists = await sdk.streams.isDataSchemaRegistered(voteSchemaId);
 
-  // Try registration once
-  try {
-    const tx = await sdk.streams.registerDataSchemas(
-      [
-        {
-          id: "proposal_schema",
-          schema: PROPOSAL_SCHEMA,
-          parentSchemaId: zeroBytes32 as Hex,
-        },
-        {
-          id: "vote_schema",
-          schema: VOTE_SCHEMA,
-          parentSchemaId: zeroBytes32 as Hex,
-        },
-      ],
-      true // allowFailure
-    );
+  console.log("📘 SCHEMA REGISTRATION STATUS:", {
+    proposalExists,
+    voteExists,
+  });
 
-    // Only wait if a real tx is returned
-    if (typeof tx === "string" && tx.startsWith("0x")) {
-      await waitForTransactionReceipt(publicClient, { hash: tx });
+  if (!proposalExists || !voteExists) {
+    const regs = [];
+
+    if (!proposalExists)
+      regs.push({
+        id: proposalSchemaId,
+        schema: PROPOSAL_SCHEMA,
+        parentSchemaId: zeroBytes32 as `0x${string}`,
+      });
+
+    if (!voteExists)
+      regs.push({
+        id: voteSchemaId,
+        schema: VOTE_SCHEMA,
+        parentSchemaId: zeroBytes32 as `0x${string}`,
+      });
+
+    console.log("📝 REGISTERING SCHEMAS:", regs);
+
+    try {
+      const tx = await sdk.streams.registerDataSchemas(regs, true);
+
+      console.log("📨 REGISTER SCHEMA TX:", tx);
+
+      if (typeof tx === "string" && tx.startsWith("0x")) {
+        await waitForTransactionReceipt(publicClient, { hash: tx as Hex });
+      }
+    } catch (err) {
+      console.error("❌ ERROR REGISTERING SCHEMAS:", err);
     }
-  } catch (e) {
-    console.warn("⚠️ Schemas probably already registered.");
   }
 
   _cachedProposalSchemaId = proposalSchemaId;
@@ -157,13 +160,19 @@ export async function ensureSchemasRegistered() {
 }
 
 /* ----------------------------------------------------
-   PUBLISH PROPOSAL
+   Publish Proposal
 ---------------------------------------------------- */
 export async function publishProposal(
   proposalId: string,
   title: string,
   proposer: string
 ) {
+  console.log("🚀 PUBLISH PROPOSAL INPUT:", {
+    proposalId,
+    title,
+    proposer,
+  });
+
   const { sdk } = initClients();
   const { proposalSchemaId } = await ensureSchemasRegistered();
 
@@ -177,103 +186,175 @@ export async function publishProposal(
     { name: "timestamp", type: "uint256", value: now },
   ]);
 
+  console.log("🧱 ENCODED PROPOSAL DATA:", data);
+
+  const recordId = toHex(`${proposalId}-${now}`, { size: 32 }) as Hex;
+
+  console.log("🆔 PROPOSAL RECORD ID:", recordId);
+
   const tx = await sdk.streams.set([
-    {
-      id: id32(`proposal-${proposalId}`),
-      schemaId: proposalSchemaId,
-      data,
-    },
+    { id: recordId, schemaId: proposalSchemaId, data },
   ]);
+
+  console.log("📨 STREAM SET TX:", tx);
 
   return String(tx);
 }
 
+
+function normalizeProposalId(input: any): string {
+  if (typeof input === "string") return input;
+
+  if (input == null) return "";
+
+  // Case: { proposalId: "X" }
+  if (typeof input === "object" && typeof input.proposalId === "string") {
+    return input.proposalId;
+  }
+
+  // Case: { proposalId: { value: "X" }}
+  if (
+    typeof input === "object" &&
+    typeof input.proposalId === "object" &&
+    typeof input.proposalId.value === "string"
+  ) {
+    return input.proposalId.value;
+  }
+
+  // Last fallback: stringify safely
+  return JSON.stringify(input);
+}
+
+
+
 /* ----------------------------------------------------
-   PUBLISH VOTE
+   Publish Vote (ADDED)
 ---------------------------------------------------- */
 export async function publishVote(
   proposalId: string,
   voter: string,
   support: boolean
 ) {
+  console.log("🚀 PUBLISH VOTE INPUT:", {
+    proposalId,
+    voter,
+    support,
+  });
+
   const { sdk } = initClients();
   const { voteSchemaId } = await ensureSchemasRegistered();
+
+  console.log("🔢 USING VOTE SCHEMA:", voteSchemaId);
+
+    // Ensure proposalId is plain string
+  const cleanId = normalizeProposalId(proposalId);
+  console.log("🧹 CLEAN PROPOSAL ID:", cleanId);
 
   const encoder = new SchemaEncoder(VOTE_SCHEMA);
   const now = BigInt(Math.floor(Date.now() / 1000));
 
   const data = encoder.encodeData([
-    { name: "proposalId", type: "string", value: proposalId },
+    { name: "proposalId", type: "string", value: cleanId },
     { name: "voter", type: "address", value: voter },
-    { name: "support", type: "bool", value: support },
+    { name: "support", type: "bool", value: !!support },
     { name: "timestamp", type: "uint256", value: now },
   ]);
 
+  console.log("🧱 ENCODED VOTE DATA:", data);
+
+  // A unique deterministic ID for vote record
+  const recordId = toHex(`vote-${cleanId}-${now}`, { size: 32 }) as Hex;
+
+  console.log("🆔 VOTE RECORD ID:", recordId);
+
   const tx = await sdk.streams.set([
-    {
-      id: id32(`vote-${proposalId}-${now}`),
-      schemaId: voteSchemaId,
-      data,
-    },
+    { id: recordId, schemaId: voteSchemaId, data },
   ]);
 
+  console.log("📨 STREAM SET TX (VOTE):", tx);
   return String(tx);
 }
 
 /* ----------------------------------------------------
-   READ PROPOSALS (SAFE)
+   Read Proposals
 ---------------------------------------------------- */
 export async function readProposals() {
   const { sdk } = initClients();
   const { proposalSchemaId } = await ensureSchemasRegistered();
 
-  let rows: any = [];
+  console.log("📡 READING PROPOSALS FOR SCHEMA:", proposalSchemaId);
+
+  let raw: any = null;
 
   try {
-    rows = await sdk.streams.getAllPublisherDataForSchema(
+    raw = await sdk.streams.getAllPublisherDataForSchema(
       proposalSchemaId,
       PUBLISHER_ADDRESS
     );
-  } catch (err: any) {
-    if (String(err).includes("NoData")) return [];
-    console.error("readProposals error", err);
+    console.log("📥 RAW STREAM DATA:", raw);
+  } catch (err) {
+    console.error("❌ ERROR READING PROPOSALS:", err);
     return [];
   }
 
-  return (rows as DecodedItem[][]).map((row) => ({
-    proposalId: extract(row[0]),
-    title: extract(row[1]),
-    proposer: extract(row[2]),
-    timestamp: Number(extract(row[3])),
-  }));
+  if (!raw) return [];
+
+  return raw.map((item: any) => {
+    console.log("🔎 RAW RECORD ITEM:", item);
+    const obj = extractFieldsFromSdkItem(item);
+    return {
+      proposalId: obj.proposalId ?? "",
+      title: obj.title ?? "",
+      proposer: obj.proposer ?? "",
+      timestamp: Number(obj.timestamp ?? 0),
+    };
+  });
 }
 
 /* ----------------------------------------------------
-   READ VOTES (SAFE)
+   Read Votes for a Proposal
 ---------------------------------------------------- */
 export async function readVotesForProposal(proposalId: string) {
   const { sdk } = initClients();
   const { voteSchemaId } = await ensureSchemasRegistered();
 
-  let rows: any = [];
+  console.log("📡 READING VOTES FOR PROPOSAL:", proposalId);
+  console.log("🔢 USING VOTE SCHEMA ID:", voteSchemaId);
+  console.log("👤 PUBLISHER:", PUBLISHER_ADDRESS);
+
+  let raw: any = null;
 
   try {
-    rows = await sdk.streams.getAllPublisherDataForSchema(
+    raw = await sdk.streams.getAllPublisherDataForSchema(
       voteSchemaId,
       PUBLISHER_ADDRESS
     );
-  } catch (err: any) {
-    if (String(err).includes("NoData")) return [];
-    console.error("readVotes error", err);
+
+    console.log("📥 RAW VOTE STREAM DATA:", raw);
+  } catch (err) {
+    console.error("❌ ERROR READING VOTES:", err);
     return [];
   }
 
-  return (rows as DecodedItem[][])
-    .map((row) => ({
-      proposalId: extract(row[0]),
-      voter: extract(row[1]),
-      support: extract(row[2]) === "true",
-      timestamp: Number(extract(row[3])),
-    }))
-    .filter((x) => x.proposalId === proposalId);
+  if (!raw) return [];
+
+  // Decode each raw SDS entry
+  const decoded = raw
+    .map((item: any) => {
+      console.log("🔎 RAW VOTE ITEM:", item);
+      const fields = extractFieldsFromSdkItem(item);
+
+      return {
+        proposalId: fields.proposalId ?? "",
+        voter: fields.voter ?? "",
+        support: fields.support ?? false,
+        timestamp: Number(fields.timestamp ?? 0),
+      };
+    })
+    // Filter votes that belong to this proposal
+    .filter((v: any) => v.proposalId === proposalId);
+
+  console.log(`📊 FILTERED VOTES FOR ${proposalId}:`, decoded);
+
+  return decoded;
 }
