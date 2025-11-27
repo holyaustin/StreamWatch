@@ -9,12 +9,14 @@ module.exports = {
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {
-      colors: {
-        primary: "#0f62fe", // blue
-        bg: "#ffffff",
-      },
-    },
+extend: {
+  colors: {
+    primary: "#1e40af", // deep blue
+    navy: "#0b1a33",    // dark navy
+    midnight: "#020617", // near black
+    accent: "#2ecc71", // green for success/highlights
+  },
+},
   },
   plugins: [],
 }

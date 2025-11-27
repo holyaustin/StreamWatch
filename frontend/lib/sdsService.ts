@@ -358,3 +358,42 @@ export async function readVotesForProposal(proposalId: string) {
 
   return decoded;
 }
+
+/* ----------------------------------------------------
+   Read ALL Votes (no filtering)
+---------------------------------------------------- */
+export async function readAllVotes() {
+  const { sdk } = initClients();
+  const { voteSchemaId } = await ensureSchemasRegistered();
+
+  console.log("📡 READING ALL VOTES FOR SCHEMA:", voteSchemaId);
+
+  let raw: any = null;
+
+  try {
+    raw = await sdk.streams.getAllPublisherDataForSchema(
+      voteSchemaId,
+      PUBLISHER_ADDRESS
+    );
+
+    console.log("📥 RAW ALL-VOTES STREAM DATA:", raw);
+  } catch (err) {
+    console.error("❌ ERROR READING ALL VOTES:", err);
+    return [];
+  }
+
+  if (!raw) return [];
+
+  // Decode each raw SDS entry
+  return raw.map((item: any) => {
+    console.log("🔎 RAW VOTE ITEM:", item);
+    const fields = extractFieldsFromSdkItem(item);
+
+    return {
+      proposalId: fields.proposalId ?? "",
+      voter: fields.voter ?? "",
+      support: fields.support ?? false,
+      timestamp: Number(fields.timestamp ?? 0),
+    };
+  });
+}

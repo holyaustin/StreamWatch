@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function ProposalsPage() {
   const [proposals, setProposals] = useState<any[]>([]);
   const [schemasLoaded, setSchemasLoaded] = useState(false);
+    const router = useRouter();
 
   // Load schemas first
   useEffect(() => {
@@ -34,6 +36,15 @@ export default function ProposalsPage() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto space-y-6">
+
+      {/* Mobile Back Button */}
+      <button
+        onClick={() => router.back()}
+        className="md:hidden mb-4 flex items-center gap-2 text-white bg-blue-600 py-2 px-4 rounded-full shadow active:scale-95"
+      >
+        <span className="text-lg">←</span> Back
+      </button>
+      
       <h1 className="text-3xl font-bold">All Proposals</h1>
 
       {proposals.length === 0 && <p>No proposals found.</p>}
@@ -41,7 +52,7 @@ export default function ProposalsPage() {
       <div className="space-y-4">
         {proposals.map((p, i) => (
           <Link href={`/proposals/${p.proposalId}`} key={i}>
-            <div className="border p-4 rounded-xl bg-gray-50 hover:bg-gray-100 cursor-pointer">
+            <div className="border p-4 rounded-xl text-gray-900 bg-gray-50 hover:bg-gray-200 cursor-pointer">
               <p><strong>ID:</strong> {p.proposalId}</p>
               <p><strong>Title:</strong> {p.title}</p>
               <p><strong>Votes:</strong> {p.votes}</p>

@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
-import { readVotesForProposal } from "@/lib/sdsService";
+import { readVotesForProposal, readAllVotes } from "@/lib/sdsService";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const proposalId = searchParams.get("proposalId") || "";
+    const proposalId = searchParams.get("proposalId");
 
-    console.log("📡 READ VOTES FOR:", proposalId);
+    console.log("📡 READ VOTES API — proposalId:", proposalId || "(ALL)");
 
-    const votes = await readVotesForProposal(proposalId);
+    const raw = proposalId
+      ? await readVotesForProposal(proposalId)
+      : await readAllVotes();
 
-    console.log("📊 VOTES RETURNED:", votes);
+    console.log("📥 RAW SDS VOTES:", raw);
 
-    return NextResponse.json(votes);
+    return NextResponse.json(raw);
   } catch (err: any) {
     console.error("❌ ERROR READING VOTES:", err);
     return NextResponse.json(

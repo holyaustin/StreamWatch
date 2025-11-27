@@ -1,20 +1,27 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { subscribeToVotes } from '@/lib/sdsStreamClient';
-import { ConnectKitButton } from 'connectkit';
-import { useAccount } from 'wagmi';
+import { useEffect, useState } from "react";
+import { subscribeToVotes } from "@/lib/sdsStreamClient";
+import { ConnectKitButton } from "connectkit";
+import { useAccount } from "wagmi";
+import { useRouter } from "next/navigation";
+
+/** Helper: shorten wallet */
+function shorten(addr: string = "") {
+  return addr.length > 10 ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : addr;
+}
 
 export default function VotePage() {
   const { isConnected, address } = useAccount();
 
   const [proposals, setProposals] = useState<any[]>([]);
-  const [selected, setSelected] = useState<string>('');
+  const [selected, setSelected] = useState<string>("");
   const [support, setSupport] = useState<boolean>(true);
-  const [liveVotes, setLiveVotes] = useState<any[]>([]);
+  const [latestVote, setLatestVote] = useState<any | null>(null);
   const [schemasLoaded, setSchemasLoaded] = useState(false);
+  const router = useRouter();
 
-  // Load schemas
+  /* Load schemas */
   useEffect(() => {
     (async () => {
       await fetch("/api/schemas", { cache: "no-store" });
@@ -22,7 +29,7 @@ export default function VotePage() {
     })();
   }, []);
 
-  // Load proposals via API
+  /* Load proposals */
   useEffect(() => {
     if (!schemasLoaded) return;
 
@@ -33,7 +40,7 @@ export default function VotePage() {
     })();
   }, [schemasLoaded]);
 
-  // Live vote streaming
+  /* Live vote streaming — only store the latest vote */
   useEffect(() => {
     if (!selected || !schemasLoaded) return;
 
@@ -41,7 +48,7 @@ export default function VotePage() {
 
     (async () => {
       unsub = await subscribeToVotes(selected, (v) => {
-        setLiveVotes((prev) => [...prev, v]);
+        setLatestVote(v);
       });
     })();
 
@@ -51,7 +58,8 @@ export default function VotePage() {
   }, [selected, schemasLoaded]);
 
   async function handleVote() {
-    if (!selected || !isConnected) return alert("Connect wallet & select proposal");
+    if (!selected || !isConnected)
+      return alert("Connect wallet & select proposal");
 
     try {
       const res = await fetch("/api/publish/vote", {
@@ -73,9 +81,20 @@ export default function VotePage() {
     }
   }
 
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
   return (
-    <div className="p-8 max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Cast Vote (Live)</h1>
+    <div className="px-8 py-2 max-w-2xl mx-auto space-y-6 text-gray-100">
+
+      {/* Mobile Back Button */}
+      <button
+        onClick={() => router.back()}
+        className="md:hidden mb-4 flex items-center gap-2 text-white bg-blue-600 py-2 px-4 rounded-full shadow active:scale-95"
+      >
+        <span className="text-lg">←</span> Back
+      </button>
+
+      <h1 className="text-2xl font-bold text-gray-100 text-center">Cast Vote (Live)</h1>
 
       {!isConnected && (
         <div className="p-4 bg-yellow-50 border rounded">
@@ -84,21 +103,70 @@ export default function VotePage() {
         </div>
       )}
 
-      <div className="space-y-3">
-        <select
-          className="w-full p-3 border rounded"
-          value={selected}
-          onChange={(e) => setSelected(e.target.value)}
-        >
-          <option value="">-- select proposal --</option>
-          {proposals.map((p: any) => (
-            <option key={p.proposalId} value={p.proposalId}>
-              {p.proposalId} — {p.title}
-            </option>
-          ))}
-        </select>
+      {/* Voting Section */}
+      <div className="space-y-3 p-6 bg-white shadow rounded-xl border text-gray-900">
 
-        <div className="flex gap-4 items-center">
+        {address && (
+          <p className="text-sm text-gray-700">
+            <strong>Your Wallet:</strong> {shorten(address)}
+          </p>
+        )}
+
+        {/* ⭐ Custom Select (Fully Responsive) */}
+        <div className="relative">
+          <button
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            className="w-full p-3 border-4 rounded bg-white text-left text-gray-900"
+          >
+            {selected
+              ? proposals.find((p) => p.proposalId === selected)?.title
+              : "-- select a proposal --"}
+          </button>
+
+          {dropdownOpen && (
+            <div
+              className="
+                absolute 
+                mt-1 
+                w-full 
+                max-h-60 
+                overflow-y-auto 
+                bg-white 
+                border 
+                rounded 
+                shadow-lg 
+                z-50 
+                p-2
+              "
+            >
+              {proposals.map((p: any) => (
+                <div
+                  key={p.proposalId}
+                  onClick={() => {
+                    setSelected(p.proposalId);
+                    setDropdownOpen(false);
+                  }}
+                  className="
+                    p-2 
+                    rounded 
+                    hover:bg-blue-100 
+                    cursor-pointer 
+                    break-words
+                    whitespace-normal
+                  "
+                >
+                  <strong>{p.proposalId}</strong> — {p.title}
+                </div>
+              ))}
+
+              {proposals.length === 0 && (
+                <p className="text-gray-500 p-2 text-sm">No proposals available</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-4 items-center text-gray-900">
           <label className="flex items-center gap-2">
             <input type="radio" checked={support} onChange={() => setSupport(true)} /> Yes
           </label>
@@ -115,22 +183,29 @@ export default function VotePage() {
         </button>
       </div>
 
-      <div>
-        <h2 className="text-lg font-semibold mt-6">Live Votes</h2>
-        {liveVotes.length === 0 && (
-          <p className="text-sm text-gray-500">No live votes yet</p>
+      {/* Latest Vote */}
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold text-gray-100">Latest Vote</h2>
+
+        {!latestVote && (
+          <p className="text-sm text-gray-300">No live votes yet</p>
         )}
-        <div className="space-y-2 mt-3">
-          {liveVotes.map((v, i) => (
-            <div key={i} className="p-2 border rounded bg-gray-50">
-              <div><strong>Voter:</strong> {v.voter}</div>
-              <div><strong>Support:</strong> {v.support ? "YES" : "NO"}</div>
-              <div className="text-xs text-gray-500">
-                {new Date((v.timestamp ?? Date.now()) * 1000).toLocaleString()}
-              </div>
+
+        {latestVote && (
+          <div className="p-4 border rounded bg-gray-50 text-gray-900 shadow-sm mt-3">
+            <div>
+              <strong>Voter:</strong> {shorten(latestVote.voter)}
             </div>
-          ))}
-        </div>
+            <div>
+              <strong>Support:</strong> {latestVote.support ? "YES" : "NO"}
+            </div>
+            <div className="text-xs text-gray-500">
+              {new Date(
+                (latestVote.timestamp ?? Date.now()) * 1000
+              ).toLocaleString()}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

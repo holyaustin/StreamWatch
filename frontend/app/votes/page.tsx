@@ -1,20 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-export default function VotesIndexPage() {
-  const [proposals, setProposals] = useState<any[]>([]);
+function shorten(addr: string = "") {
+  return addr.length > 10 ? `${addr.slice(0,6)}...${addr.slice(-4)}` : addr;
+}
+
+export default function AllVotesPage() {
+  const [votes, setVotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   async function load() {
-    setLoading(true);
     try {
-      const res = await fetch("/api/read/proposals", { cache: "no-store" });
-      const items = await res.json();
-      setProposals(items ?? []);
-    } catch (e) {
-      console.error(e);
+      const res = await fetch("/api/read/vote");
+      const data = await res.json();
+
+      setVotes(
+        data.sort(
+          (a: any, b: any) => (b.timestamp ?? 0) - (a.timestamp ?? 0)
+        )
+      );
+    } catch (err) {
+      console.error("Failed to load votes:", err);
     } finally {
       setLoading(false);
     }
@@ -25,24 +34,49 @@ export default function VotesIndexPage() {
   }, []);
 
   return (
-    <div className="p-8 max-w-3xl mx-auto space-y-6">
-      <h1 className="text-3xl font-bold">All Votes / Proposals</h1>
+    <div className="px-6 py-4 max-w-3xl mx-auto text-gray-100 space-y-6">
 
-      {loading && <p>Loading proposals…</p>}
+      {/* Back button mobile */}
+      <button
+        onClick={() => router.back()}
+        className="md:hidden flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full shadow"
+      >
+        ← Back
+      </button>
 
-      {!loading && proposals.length === 0 && (
-        <p className="text-gray-600">No proposals yet.</p>
+      <h1 className="text-3xl font-bold text-center">All Votes</h1>
+
+      {loading && <p className="text-gray-300 text-center">Loading...</p>}
+
+      {!loading && votes.length === 0 && (
+        <p className="text-gray-300 text-center">No votes recorded yet.</p>
       )}
 
-      <div className="space-y-3">
-        {proposals.map((p) => (
-          <Link href={`/votes/${p.proposalId}`} key={p.proposalId}>
-            <div className="border p-4 rounded-xl bg-gray-50 hover:bg-gray-100 cursor-pointer">
-              <p><strong>ID:</strong> {p.proposalId}</p>
-              <p><strong>Title:</strong> {p.title}</p>
-              <p><strong>Votes:</strong> {p.votes}</p>
-            </div>
-          </Link>
+      <div className="space-y-4">
+        {votes.map((v: any, i: number) => (
+          <div
+            key={i}
+            className="p-4 bg-white text-gray-900 rounded-xl shadow border"
+          >
+            <p>
+              <strong>Proposal:</strong> {v.proposalId}
+            </p>
+
+            <p className="mt-1">
+              <strong>Voter:</strong> {shorten(v.voter)}
+            </p>
+
+            <p className="mt-1">
+              <strong>Support:</strong>{" "}
+              <span className={v.support ? "text-green-700" : "text-red-600"}>
+                {v.support ? "YES" : "NO"}
+              </span>
+            </p>
+
+            <p className="text-xs text-gray-500 mt-2">
+              {new Date((v.timestamp ?? Date.now()) * 1000).toLocaleString()}
+            </p>
+          </div>
         ))}
       </div>
     </div>
