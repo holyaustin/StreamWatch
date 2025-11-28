@@ -1,79 +1,177 @@
-# 🛰️ StreamWatch — Real-Time DAO Governance Tracker
+# **StreamWatchDAO — Real-Time Governance Powered by Somnia Data Streams**
 
-StreamWatch — Real-time DAO governance tracker built on **Somnia Data Streams SDK**.
-
-A hackathon-ready demo that shows how Somnia Data Streams can power live proposals and votes in a transparent, on-chain manner. The project uses a single Next.js app (frontend + server API routes) so it can be deployed to **Vercel** as one project.
-
----
-
-# 🚀 Overview
-
+### **A Next-Generation DAO with Live Proposal & Voting Powered by SDS**
 StreamWatch brings governance transparency to DAOs by providing live updates on proposals and votes using Somnia Data Streams SDK.
 Users can connect their wallet, view active proposals, and see vote tallies update as they happen — no page refresh needed.
 
 This project was built for the Somnia Hackathon, highlighting the power of streaming blockchain data in real-time governance.
 
+
+**Verified DAO Contract:**  
+`0x76E02311988b9c61d1FA64BcBb3C8b092834c568`  
+_(Somnia Dream Chain — Chain ID 50312)_
+
 ---
 
-## Features
+## 🏆 Hackathon Highlight
 
-- Live proposals & vote publishing via Somnia Data Streams SDK  
-- Wallet connect using **ConnectKit** + **wagmi** (viem-based RPC)  
-- Polling reads for serverless-friendly real-time UI (3500 ms default)  
-- Clean blue & white UI with TailwindCSS v3  
-- Single deployable Next.js app (pages/api server + app/ UI)
+**StreamWatchDAO** is a case study demonstrating how **Somnia Data Streams (SDS)** can be used to build **real-time DAO governance** — a use case _not originally listed_ among the recommended SDS integrations.
+
+This project proves that SDS is not limited to gaming, identity, or analytics.  
+It can revolutionize **decentralized governance** by providing:
+
+- Instant proposal indexing
+- Real-time vote streaming
+- Lightning-fast data reads
+- A transparent and queryable governance history
+- Version-controlled datasets
+- A hybrid model combining blockchain security + SDS performance
+
+**This is a new SDS category:  
+🟦 Real-Time Decentralized Governance Layer.**
+
+---
+
+# 🚀 What is StreamWatchDAO?
+
+StreamWatchDAO is a **real-time governance dashboard** that merges:
+
+### **1. Somnia Smart Contract Governance**
+
+Handles:
+
+- Proposal creation
+- On-chain voting
+- Authenticity & security guarantees
+
+### **2. Somnia Data Streams (SDS)**
+
+Offers:
+
+- Real-time indexing
+- Lightning-fast reads
+- Live vote streaming via subscriptions
+- Structured data records
+- Version-controlled governance datasets
+
+### **3. Next.js Frontend**
+
+Provides:
+
+- Fully responsive UI
+- Live updates without page refresh
+- Integrated wallet authentication
+- Mobile-first voting interface
+
+---
+
+# 📡 Why SDS Matters for a DAO
+
+### _(Strong justification for judges)_
+
+DAO governance typically suffers from:
+
+| Traditional Problem                       | SDS Solution                               |
+| ----------------------------------------- | ------------------------------------------ |
+| On-chain reads are slow & expensive       | SDS provides **free, instant reads**       |
+| UIs refresh only after block confirmation | SDS streams deliver **live events**        |
+| Difficult to index proposal history       | SDS stores **structured & queryable data** |
+| Analytics require subgraphs               | SDS schemas act as **built-in indexers**   |
+| Hard to reset datasets for demos/testing  | SDS supports **schema versioning**         |
+
+### 💡 SDS is a perfect fit for DAOs:
+
+- Real-time votes
+- High-speed queries
+- Historical analysis
+- Transparent governance
+- Accurate UI updates in milliseconds
+
+**StreamWatchDAO demonstrates a new frontier for SDS:  
+A real-time, trust-enhanced governance engine.**
+
+---
+
+# 🧠 System Architecture
+
+---
+
+# 📦 Tech Stack
+
+### **Blockchain / Governance**
+
+- Somnia Dream Chain
+- Verified DAO contract
+- Wallet-based identity
+
+### **Data Layer**
+
+- Somnia Data Streams
+- Schema Versioning
+- Real-time stream subscriptions
+
+### **Frontend**
+
+- Next.js 14 (App Router)
+- TailwindCSS
+- Wagmi + WalletKit
+- Responsive components
+
+### **Backend**
+
+- Next.js API Routes
+- SDS service abstraction
+- Automatic schema registration
+
+---
+
+🛠 DAO Smart Contract
+Verified on Somnia Dream Network
+
+0x76E02311988b9c61d1FA64BcBb3C8b092834c568
+
+Includes:
+
+Proposal creation
+
+Voting
+
+Execution logic
+
+Events for SDS mirroring
+
+🎯 Why This Project Matters
+
+1. Introduces a new SDS use case: DAO governance
+
+Not originally suggested by Somnia — but fits perfectly.
+
+2. Enhances decentralized decision-making
+
+Real-time transparency = better governance.
+
+3. Proves SDS as a high-speed data indexer
+
+Replaces slow RPC reads and expensive subgraphs.
+
+4. Provides a template for future Somnia-based DAOs
+
+This can evolve into a governance toolkit.
 
 ---
 
 ## Quick links
 
-- Somnia Docs — Data Streams quickstart and tutorials: https://docs.somnia.network/somnia-data-streams/getting-started/quickstart  
-- Somnia On-chain chat tutorial: https://docs.somnia.network/somnia-data-streams/tutorials/build-a-minimal-on-chain-chat-app  
+- Somnia Docs — Data Streams quickstart and tutorials: https://docs.somnia.network/somnia-data-streams/getting-started/quickstart
+- Somnia On-chain chat tutorial: https://docs.somnia.network/somnia-data-streams/tutorials/build-a-minimal-on-chain-chat-app
 - ConnectKit guide (Somnia): https://docs.somnia.network/developer/building-dapps/wallet-integration-and-auth/authenticating-with-connectkit
 
 ---
 
-## Repo layout
-
-
-
-
-
-
-
-
-# 🛰️ StreamWatch — Real-Time DAO Governance Tracker
-
-Track DAO proposals, votes, and quorum updates in real-time using Somnia Data Streams, powered by Next.js + ConnectKit + Recharts + TailwindCSS.
-
-# 🚀 Overview
-
-StreamWatch brings governance transparency to DAOs by providing live updates on proposals and votes using Somnia Data Streams SDK.
-Users can connect their wallet, view active proposals, and see vote tallies update as they happen — no page refresh needed.
-
-This project was built for the Somnia Hackathon, highlighting the power of streaming blockchain data in real-time governance.
-
-# 🧩 Features
-
-- ✅ Real-Time Data: Live proposal and voting updates via Somnia Data Streams
-- ✅ Wallet Integration: Seamless wallet connect with ConnectKit
-- ✅ On-Chain DAO Governance: Built on the Somnia Testnet
-- ✅ Data Visualization: Realtime charts with Recharts
-- ✅ Unified Next.js Architecture: Backend API routes and frontend in one deployable app
-- ✅ Modern UI: TailwindCSS (Blue/White Theme)
-
-# 🏗️ Tech Stack
-- Layer Technology
-- Frontend Next.js 14, TailwindCSS v3, Recharts
-- Backend Next.js API Routes (Node.js + Somnia SDK)
-- Wallet ConnectKit + Wagmi + ethers v6
-- Smart Contract Solidity v0.8.30 + Hardhat v2 + Typescript
-- Blockchain Somnia Testnet
-- Streaming SDK Somnia Data Streams SDK
-
 # ⚙️ Installation & Setup
 
 1. Clone the Repository
+
    - git clone https://github.com/holyaustin/streamwatch.git
    - cd streamwatch
 
@@ -98,42 +196,10 @@ Create a .env.local file at the root of your project:
 If you don’t have an API key, get one from Somnia Developer Dashboard
 .
 
-# 🧠 Architecture Overview
-
-streamwatch/
-├── contracts/ # Smart Contracts (DAO Governance)
-│ ├── DaoGovernance.sol
-│ ├── scripts/deploy.ts
-│ └── test/dao.test.ts
-│
-├── src/
-│ ├── app/ # Next.js App Router
-│ │ ├── page.tsx # Landing Page
-│ │ ├── dashboard/page.tsx # Governance Dashboard
-│ │ └── api/ # API Routes for backend logic
-│ │ ├── proposals/route.ts
-│ │ └── stream/route.ts
-│ │
-│ ├── components/ # Reusable UI components
-│ │ ├── Header.tsx
-│ │ ├── Footer.tsx
-│ │ ├── ProposalCard.tsx
-│ │ └── LiveChart.tsx
-│ │
-│ ├── lib/ # SDK & Utility functions
-│ │ └── somnia.ts # Somnia Data Streams SDK setup
-│ │
-│ └── styles/ # TailwindCSS styling
-│ └── globals.css
-│
-├── hardhat.config.ts # Hardhat Configuration
-├── package.json
-├── tailwind.config.js
-└── README.md
-
 🪄 Run Locally
 
 1. Compile & Deploy Contract (Somnia Testnet)
+
    - cd contracts
    - npx hardhat compile
    - npx hardhat run scripts/deploy.ts --network somnia-testnet
@@ -147,7 +213,9 @@ npm run dev
 Visit your app at 👉 http://localhost:3000
 
 ## 🧰 API Endpoints
+
 Endpoint Description
+
 - /api/stream Establishes real-time Somnia data stream
 - /api/proposals Fetches latest DAO proposals
 - /api/votes Fetches or subscribes to live vote data
@@ -190,6 +258,21 @@ MIT © 2025 [Your Name or Team Name]
 
 - Recharts Documentation
 
+## ⭐  Conclusion
 
+StreamWatchDAO demonstrates that Somnia Data Streams can transform DAO governance, making it:
 
-{"proposalSchemaId":"0xf4c7813bc6f90af786c6b7c9945222532ec3fdbc005e67340da6b77e3c43f3a2","voteSchemaId":"0xcc66e482e0a9a3ee984aaaa39c6ebe6546b93f92a5c830f88930027fa47cba6c"}
+- Faster
+
+- More transparent
+
+- More interactive
+
+- More data-driven
+
+- More aligned with real-time communities
+
+This project opens a new category of SDS-powered applications
+→ Real-time decentralized governance for Web3 communities.
+
+Made with ❤️ for the Somnia Hackathon.

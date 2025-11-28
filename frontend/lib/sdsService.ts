@@ -27,19 +27,21 @@ export const dreamChain = defineChain({
    Env
 ---------------------------------------------------- */
 const PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`;
+const SCHEMA_VERSION = process.env.SDS_SCHEMA_VERSION || "v1";
 const account = privateKeyToAccount(PRIVATE_KEY);
 
 export const PUBLISHER_ADDRESS =
   (process.env.PUBLISHER_ADDRESS as `0x${string}`) || account.address;
 
 /* ----------------------------------------------------
-   Schemas
+   VERSIONED SCHEMAS
+   ⚠️ Changing SDS_SCHEMA_VERSION resets data automatically
 ---------------------------------------------------- */
 export const PROPOSAL_SCHEMA =
-  "string proposalId, string title, address proposer, uint256 timestamp";
+  `string proposalId, string title, address proposer, uint256 timestamp, string version`;
 
 export const VOTE_SCHEMA =
-  "string proposalId, address voter, bool support, uint256 timestamp";
+  `string proposalId, address voter, bool support, uint256 timestamp, string version`;
 
 // cache
 let _cachedProposalSchemaId: `0x${string}` | undefined;
@@ -61,7 +63,6 @@ function safeValue(v: any) {
 function extractFieldsFromSdkItem(item: any): Record<string, any> {
   const out: Record<string, any> = {};
 
-  // SDS returns array: [ {name, value: {value}} , ... ]
   if (Array.isArray(item)) {
     for (const field of item) {
       const raw = field?.value?.value;
@@ -71,7 +72,7 @@ function extractFieldsFromSdkItem(item: any): Record<string, any> {
     }
   }
 
-  console.log("🔍 DECODED SDK ITEM (FIXED):", out);
+  console.log("🔍 DECODED SDK ITEM:", out);
   return out;
 }
 
@@ -96,7 +97,7 @@ function initClients() {
 }
 
 /* ----------------------------------------------------
-   Register Schemas
+   Register Schemas (AUTO handles versioning)
 ---------------------------------------------------- */
 export async function ensureSchemasRegistered() {
   const { sdk, publicClient } = initClients();
@@ -109,11 +110,10 @@ export async function ensureSchemasRegistered() {
   console.log("🧩 COMPUTED SCHEMA IDS:", {
     proposalSchemaId,
     voteSchemaId,
+    SCHEMA_VERSION,
   });
 
-  const proposalExists = await sdk.streams.isDataSchemaRegistered(
-    proposalSchemaId
-  );
+  const proposalExists = await sdk.streams.isDataSchemaRegistered(proposalSchemaId);
   const voteExists = await sdk.streams.isDataSchemaRegistered(voteSchemaId);
 
   console.log("📘 SCHEMA REGISTRATION STATUS:", {
@@ -184,6 +184,7 @@ export async function publishProposal(
     { name: "title", type: "string", value: title },
     { name: "proposer", type: "address", value: proposer },
     { name: "timestamp", type: "uint256", value: now },
+    { name: "version", type: "string", value: SCHEMA_VERSION },
   ]);
 
   console.log("🧱 ENCODED PROPOSAL DATA:", data);
@@ -201,34 +202,19 @@ export async function publishProposal(
   return String(tx);
 }
 
-
+/* ----------------------------------------------------
+   Normalize ProposalId
+---------------------------------------------------- */
 function normalizeProposalId(input: any): string {
   if (typeof input === "string") return input;
-
   if (input == null) return "";
-
-  // Case: { proposalId: "X" }
-  if (typeof input === "object" && typeof input.proposalId === "string") {
-    return input.proposalId;
-  }
-
-  // Case: { proposalId: { value: "X" }}
-  if (
-    typeof input === "object" &&
-    typeof input.proposalId === "object" &&
-    typeof input.proposalId.value === "string"
-  ) {
-    return input.proposalId.value;
-  }
-
-  // Last fallback: stringify safely
+  if (input?.proposalId) return input.proposalId;
+  if (input?.proposalId?.value) return input.proposalId.value;
   return JSON.stringify(input);
 }
 
-
-
 /* ----------------------------------------------------
-   Publish Vote (ADDED)
+   Publish Vote
 ---------------------------------------------------- */
 export async function publishVote(
   proposalId: string,
@@ -244,12 +230,7 @@ export async function publishVote(
   const { sdk } = initClients();
   const { voteSchemaId } = await ensureSchemasRegistered();
 
-  console.log("🔢 USING VOTE SCHEMA:", voteSchemaId);
-
-    // Ensure proposalId is plain string
   const cleanId = normalizeProposalId(proposalId);
-  console.log("🧹 CLEAN PROPOSAL ID:", cleanId);
-
   const encoder = new SchemaEncoder(VOTE_SCHEMA);
   const now = BigInt(Math.floor(Date.now() / 1000));
 
@@ -258,11 +239,11 @@ export async function publishVote(
     { name: "voter", type: "address", value: voter },
     { name: "support", type: "bool", value: !!support },
     { name: "timestamp", type: "uint256", value: now },
+    { name: "version", type: "string", value: SCHEMA_VERSION },
   ]);
 
   console.log("🧱 ENCODED VOTE DATA:", data);
 
-  // A unique deterministic ID for vote record
   const recordId = toHex(`vote-${cleanId}-${now}`, { size: 32 }) as Hex;
 
   console.log("🆔 VOTE RECORD ID:", recordId);
@@ -298,7 +279,6 @@ export async function readProposals() {
       proposalSchemaId,
       PUBLISHER_ADDRESS
     );
-    console.log("📥 RAW STREAM DATA:", raw);
   } catch (err) {
     console.error("❌ ERROR READING PROPOSALS:", err);
     return [];
@@ -306,9 +286,7 @@ export async function readProposals() {
 
   if (!raw) return [];
 
-  //return raw.map((item: any) => {
- const proposals: Proposal[] = raw.map((item: any) => {
-    console.log("🔎 RAW RECORD ITEM:", item);
+  const proposals: Proposal[] = raw.map((item: any) => {
     const obj = extractFieldsFromSdkItem(item);
     return {
       proposalId: obj.proposalId ?? "",
@@ -318,15 +296,14 @@ export async function readProposals() {
     };
   });
 
-   // 🔥 Add dynamic vote counts
   const enriched = await Promise.all(
     proposals.map(async (p) => {
       const votes = await readVotesForProposal(p.proposalId);
 
       return {
         ...p,
-        status: "Active",       // could be computed later
-        votes: votes.length,    // 🔥 Real vote count
+        status: "Active",
+        votes: votes.length,
       };
     })
   );
@@ -341,10 +318,6 @@ export async function readVotesForProposal(proposalId: string) {
   const { sdk } = initClients();
   const { voteSchemaId } = await ensureSchemasRegistered();
 
-  console.log("📡 READING VOTES FOR PROPOSAL:", proposalId);
-  console.log("🔢 USING VOTE SCHEMA ID:", voteSchemaId);
-  console.log("👤 PUBLISHER:", PUBLISHER_ADDRESS);
-
   let raw: any = null;
 
   try {
@@ -352,8 +325,6 @@ export async function readVotesForProposal(proposalId: string) {
       voteSchemaId,
       PUBLISHER_ADDRESS
     );
-
-    console.log("📥 RAW VOTE STREAM DATA:", raw);
   } catch (err) {
     console.error("❌ ERROR READING VOTES:", err);
     return [];
@@ -361,35 +332,28 @@ export async function readVotesForProposal(proposalId: string) {
 
   if (!raw) return [];
 
-  // Decode each raw SDS entry
   const decoded = raw
     .map((item: any) => {
-      console.log("🔎 RAW VOTE ITEM:", item);
       const fields = extractFieldsFromSdkItem(item);
 
       return {
-         proposalId: String(fields.proposalId ?? "").trim(),
+        proposalId: String(fields.proposalId ?? "").trim(),
         voter: fields.voter ?? "",
         support: fields.support ?? false,
         timestamp: Number(fields.timestamp ?? 0),
       };
     })
-    // Filter votes that belong to this proposal
-     .filter((v: any) => v.proposalId === String(proposalId).trim());
-
-  console.log(`📊 FILTERED VOTES FOR ${proposalId}:`, decoded);
+    .filter((v: any) => v.proposalId === String(proposalId).trim());
 
   return decoded;
 }
 
 /* ----------------------------------------------------
-   Read ALL Votes (no filtering)
+   Read ALL Votes
 ---------------------------------------------------- */
 export async function readAllVotes() {
   const { sdk } = initClients();
   const { voteSchemaId } = await ensureSchemasRegistered();
-
-  console.log("📡 READING ALL VOTES FOR SCHEMA:", voteSchemaId);
 
   let raw: any = null;
 
@@ -398,8 +362,6 @@ export async function readAllVotes() {
       voteSchemaId,
       PUBLISHER_ADDRESS
     );
-
-    console.log("📥 RAW ALL-VOTES STREAM DATA:", raw);
   } catch (err) {
     console.error("❌ ERROR READING ALL VOTES:", err);
     return [];
@@ -407,9 +369,7 @@ export async function readAllVotes() {
 
   if (!raw) return [];
 
-  // Decode each raw SDS entry
   return raw.map((item: any) => {
-    console.log("🔎 RAW VOTE ITEM:", item);
     const fields = extractFieldsFromSdkItem(item);
 
     return {

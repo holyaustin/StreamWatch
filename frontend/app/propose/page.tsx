@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { ConnectKitButton } from "connectkit";
 import { useAccount } from "wagmi";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+import { createProposalOnChain } from "@/lib/contract";
 
 export default function ProposePage() {
   const { isConnected, address } = useAccount();
@@ -13,58 +15,45 @@ export default function ProposePage() {
   const [loading, setLoading] = useState(false);
   const [proposals, setProposals] = useState<any[]>([]);
   const router = useRouter();
-  // Shorten wallet address responsively
-  const shortAddr = address
-    ? `${address.slice(0, 6)}...${address.slice(-4)}`
-    : "";
 
- async function loadProposals() {
-  try {
-    const res = await fetch("/api/read/proposals");
-    const data = await res.json();
+  const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "";
 
-    console.log("📡 RECEIVED PROPOSALS:", data);
+  async function loadProposals() {
+    try {
+      const res = await fetch("/api/read/proposals");
+      const data = await res.json();
 
-    if (!Array.isArray(data) || data.length === 0) {
-      setProposals([]);
-      return;
+      if (!Array.isArray(data) || data.length === 0) {
+        setProposals([]);
+        return;
+      }
+
+      setProposals([data[data.length - 1]]);
+    } catch (err) {
+      toast.error("Failed loading proposals.");
     }
-
-    // Extract **ONLY the last (latest) proposal**
-    const latest = data[data.length - 1];
-
-    console.log("🔥 LATEST PROPOSAL:", latest);
-
-    setProposals([latest]); // ALWAYS only ONE entry
-  } catch (err) {
-    console.error("Failed loading proposals:", err);
   }
-}
-
 
   useEffect(() => {
     loadProposals();
   }, []);
 
   async function submitProposal() {
-    console.log("📝 FORM INPUT BEFORE SUBMIT:", {
-      proposalId,
-      title,
-      proposer: address,
-    });
-
     if (!proposalId || !title || !address)
-      return alert("Fill all fields and connect wallet");
+      return toast.error("Fill all fields & connect wallet");
 
     setLoading(true);
-    try {
-      const body = {
-        proposalId,
-        title,
-        proposer: address,
-      };
 
-      console.log("📤 FRONTEND SENDING TO API:", body);
+    try {
+      // Chain transaction
+      toast.loading("Submitting proposal on-chain...");
+      const receipt = await createProposalOnChain(proposalId, title);
+      toast.dismiss();
+      toast.success("On-chain proposal created!");
+
+      // SDS Publish
+      toast.loading("Publishing to SDS...");
+      const body = { proposalId, title, proposer: address };
 
       const res = await fetch("/api/publish/proposal", {
         method: "POST",
@@ -73,15 +62,21 @@ export default function ProposePage() {
       });
 
       const out = await res.json();
-      console.log("📥 FRONTEND RESPONSE FROM API:", out);
+      toast.dismiss();
 
-      alert("Proposal published: " + out.tx);
+      if (!res.ok) {
+        toast.error("SDS storage failed");
+        return;
+      }
+
+      toast.success("Proposal saved in SDS!");
+
       setProposalId("");
       setTitle("");
       await loadProposals();
-    } catch (err) {
-      console.error("❌ FRONTEND PUBLISH ERROR:", err);
-      alert("Failed to publish proposal");
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err?.message || "Proposal failed");
     } finally {
       setLoading(false);
     }
@@ -89,30 +84,16 @@ export default function ProposePage() {
 
   return (
     <div className="px-8 py-2 max-w-2xl mx-auto space-y-8 text-gray-900">
-      {/* Mobile Back Button */}
-        <button
-          onClick={() => router.back()}
-          className="
-            md:hidden 
-            mb-4 
-            flex 
-            items-center 
-            gap-2 
-            text-white 
-            bg-blue-600 
-            py-2 
-            px-4 
-            rounded-full 
-            shadow 
-            active:scale-95 
-          "
-        >
-  <span className="text-lg">←</span> Back
-</button>
+
+      <button
+        onClick={() => router.back()}
+        className="md:hidden mb-4 flex items-center gap-2 text-white bg-blue-600 py-2 px-4 rounded-full shadow active:scale-95"
+      >
+        <span className="text-lg">←</span> Back
+      </button>
 
       <h1 className="text-3xl font-bold text-white text-center">Create Proposal</h1>
 
-      {/* Wallet Connection Notice */}
       {!isConnected && (
         <div className="p-4 border rounded-xl bg-yellow-50 text-gray-900">
           <p className="mb-2">Connect your wallet to create proposals</p>
@@ -120,13 +101,11 @@ export default function ProposePage() {
         </div>
       )}
 
-      {/* Form */}
       <div className="space-y-4 p-6 border rounded-xl bg-white shadow text-gray-900">
+
         <div className="text-sm text-gray-700 mb-2">
           <strong>Connected as:</strong>{" "}
-          <span className="font-mono text-blue-700 break-all">
-            {shortAddr}
-          </span>
+          <span className="font-mono text-blue-700 break-all">{shortAddr}</span>
         </div>
 
         <input
@@ -150,11 +129,10 @@ export default function ProposePage() {
           disabled={loading}
           className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:bg-gray-400"
         >
-          {loading ? "Submitting..." : "Publish Proposal"}
+          {loading ? "Submitting..." : "Publish Proposal (on-chain → SDS)"}
         </button>
       </div>
 
-      {/* LATEST PROPOSAL */}
       <h2 className="text-2xl font-semibold text-white">Latest Proposal</h2>
 
       {proposals.length === 0 && (
@@ -163,18 +141,13 @@ export default function ProposePage() {
 
       <div className="space-y-4">
         {proposals.map((p, i) => (
-          <div
-            key={i}
-            className="border rounded-xl p-4 bg-white shadow text-gray-900"
-          >
+          <div key={i} className="border rounded-xl p-4 bg-white shadow text-gray-900">
             <p><strong>ID:</strong> {p.proposalId}</p>
             <p><strong>Title:</strong> {p.title}</p>
             <p className="break-all">
               <strong>Proposer:</strong>{" "}
               <span className="font-mono text-blue-700">
-                {p.proposer
-                  ? `${p.proposer.slice(0, 6)}...${p.proposer.slice(-4)}`
-                  : ""}
+                {p.proposer ? `${p.proposer.slice(0, 6)}...${p.proposer.slice(-4)}` : ""}
               </span>
             </p>
           </div>

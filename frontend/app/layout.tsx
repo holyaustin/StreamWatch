@@ -2,6 +2,7 @@ import "./globals.css";
 import ClientProvider from "../components/ClientProvider";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { Toaster } from "react-hot-toast";
 
 export const metadata = {
   title: "StreamWatch DAO",
@@ -26,6 +27,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* MAIN CONTENT (fills the screen between header and footer) */}
           <main className="flex-1 w-full px-4 md:px-0 max-w-6xl mx-auto py-6">
             {children}
+                    <Toaster 
+                      position="top-center"
+                      toastOptions={{
+                        duration: 3500,
+                        style: { background: "#333", color: "#fff" },
+                      }}
+                    />
           </main>
 
           <Footer />

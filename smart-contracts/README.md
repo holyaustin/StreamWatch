@@ -13,6 +13,9 @@ npx hardhat ignition deploy ./ignition/modules/Lock.ts
 ```
 
 
-DAO deployed to: 0xd760d4cB1Ca9dFeF8180B105E4A02420F8018BED
+StreamWatchDAO deployed to: 0x76E02311988b9c61d1FA64BcBb3C8b092834c568
 
-  SDS contractAddress: '0x6AB397FF662e42312c003175DCD76EfF69D048Fc',
+SDS contractAddress: '0x6AB397FF662e42312c003175DCD76EfF69D048Fc'
+
+Successfully verified contract StreamWatchDAO on the block explorer.
+https://shannon-explorer.somnia.network/address/0x76E02311988b9c61d1FA64BcBb3C8b092834c568#code

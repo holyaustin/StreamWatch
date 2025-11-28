@@ -14,9 +14,11 @@
     "@wagmi/core": "^2.22.1",
     "connectkit": "^1.9.1",
     "dotenv": "^17.2.3",
+    "ethers": "^6.15.0",
     "next": "16.0.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-hot-toast": "^2.6.0",
     "recharts": "^3.4.1",
     "viem": "^2.39.0",
     "wagmi": "^2.19.3"
