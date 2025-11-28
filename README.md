@@ -276,3 +276,5 @@ This project opens a new category of SDS-powered applications
 → Real-time decentralized governance for Web3 communities.
 
 Made with ❤️ for the Somnia Hackathon.
+
+twitter: @holyaustin
