@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 export default function ProposalsPage() {
   const [proposals, setProposals] = useState<any[]>([]);
   const [schemasLoaded, setSchemasLoaded] = useState(false);
-    const router = useRouter();
+  const router = useRouter();
 
   // Load schemas first
   useEffect(() => {
@@ -52,7 +52,7 @@ export default function ProposalsPage() {
       <div className="space-y-4">
         {proposals.map((p, i) => (
           <Link href={`/proposals/${p.proposalId}`} key={i}>
-            <div className="border p-4 rounded-xl text-gray-900 bg-gray-50 hover:bg-gray-200 cursor-pointer">
+            <div className="border p-4 rounded-xl mb-2 text-gray-900 bg-gray-50 hover:bg-gray-200 cursor-pointer">
               <p><strong>ID:</strong> {p.proposalId}</p>
               <p><strong>Title:</strong> {p.title}</p>
               <p><strong>Votes:</strong> {p.votes}</p>

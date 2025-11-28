@@ -15,4 +15,4 @@ npx hardhat ignition deploy ./ignition/modules/Lock.ts
 
 DAO deployed to: 0xd760d4cB1Ca9dFeF8180B105E4A02420F8018BED
 
-  contractAddress: '0x6AB397FF662e42312c003175DCD76EfF69D048Fc',
+  SDS contractAddress: '0x6AB397FF662e42312c003175DCD76EfF69D048Fc',

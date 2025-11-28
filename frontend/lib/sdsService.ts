@@ -278,6 +278,13 @@ export async function publishVote(
 /* ----------------------------------------------------
    Read Proposals
 ---------------------------------------------------- */
+type Proposal = {
+  proposalId: string;
+  title: string;
+  proposer: string;
+  timestamp: number;
+};
+
 export async function readProposals() {
   const { sdk } = initClients();
   const { proposalSchemaId } = await ensureSchemasRegistered();
@@ -299,7 +306,8 @@ export async function readProposals() {
 
   if (!raw) return [];
 
-  return raw.map((item: any) => {
+  //return raw.map((item: any) => {
+ const proposals: Proposal[] = raw.map((item: any) => {
     console.log("🔎 RAW RECORD ITEM:", item);
     const obj = extractFieldsFromSdkItem(item);
     return {
@@ -309,6 +317,21 @@ export async function readProposals() {
       timestamp: Number(obj.timestamp ?? 0),
     };
   });
+
+   // 🔥 Add dynamic vote counts
+  const enriched = await Promise.all(
+    proposals.map(async (p) => {
+      const votes = await readVotesForProposal(p.proposalId);
+
+      return {
+        ...p,
+        status: "Active",       // could be computed later
+        votes: votes.length,    // 🔥 Real vote count
+      };
+    })
+  );
+
+  return enriched;
 }
 
 /* ----------------------------------------------------
@@ -345,14 +368,14 @@ export async function readVotesForProposal(proposalId: string) {
       const fields = extractFieldsFromSdkItem(item);
 
       return {
-        proposalId: fields.proposalId ?? "",
+         proposalId: String(fields.proposalId ?? "").trim(),
         voter: fields.voter ?? "",
         support: fields.support ?? false,
         timestamp: Number(fields.timestamp ?? 0),
       };
     })
     // Filter votes that belong to this proposal
-    .filter((v: any) => v.proposalId === proposalId);
+     .filter((v: any) => v.proposalId === String(proposalId).trim());
 
   console.log(`📊 FILTERED VOTES FOR ${proposalId}:`, decoded);
 

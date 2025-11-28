@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 function shorten(addr: string = "") {
-  return addr.length > 10 ? `${addr.slice(0,6)}...${addr.slice(-4)}` : addr;
+  return addr.length > 10 ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : addr;
 }
 
 export default function AllVotesPage() {
@@ -56,7 +56,11 @@ export default function AllVotesPage() {
         {votes.map((v: any, i: number) => (
           <div
             key={i}
-            className="p-4 bg-white text-gray-900 rounded-xl shadow border"
+            onClick={() => router.push(`/votes/${v.proposalId}`)}
+            className="
+              p-4 bg-white text-gray-900 rounded-xl shadow border cursor-pointer
+              transition hover:shadow-lg hover:scale-[1.01] active:scale-[0.98]
+            "
           >
             <p>
               <strong>Proposal:</strong> {v.proposalId}
